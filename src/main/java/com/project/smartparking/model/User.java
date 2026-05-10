@@ -6,25 +6,24 @@ import java.sql.Timestamp;
 
 @Entity
 @Table(name = "users")
-
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
+@Builder
 public class User {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "user_id")
-private Long userId;
+    private Long userId;
 
-        @Column(name = "first_name")
-        private String firstName;
+    @Column(name = "first_name")
+    private String firstName;
 
-        @Column(name = "last_name")
-        private String lastName;
+    @Column(name = "last_name")
+    private String lastName;
 
     private String phone;
-
 
     @Column(name = "email", unique = true)
     private String email;
@@ -33,27 +32,29 @@ private Long userId;
     private String password;
 
     @Column(name = "status")
-    private String status; // Active, Inactive
+    private String status;
 
     @Column(name = "role")
-    private String role;
+    @Enumerated(EnumType.STRING)
+    private Role role;
 
     @Column(name = "created_at")
     private Timestamp createdAt;
 
-     public enum Role {
+    // DO NOT add any manual getters/setters - Lombok handles all of them
+
+    public enum Role {
         ADMIN,
-        STAFF,
-        USER;
+        ATTENDANT,
+        COMMUTER,;
 
         public static Role fromString(String role) {
+            if (role == null) return COMMUTER;
             try {
-                return Role.valueOf(role.toUpperCase());
-            } catch (Exception e) {
-                return null;
+                return Role.valueOf(role.trim().toUpperCase());
+            } catch (IllegalArgumentException e) {
+                return COMMUTER;
             }
         }
-        
-
     }
 }

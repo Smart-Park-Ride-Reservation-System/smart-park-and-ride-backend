@@ -1,19 +1,17 @@
 package com.project.smartparking.controller;
 
-import org.springframework.web.bind.annotation.RestController;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.CrossOrigin;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.http.ResponseEntity;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+
 import com.project.smartparking.dto.LoginRequest;
 import com.project.smartparking.dto.SignupRequest;
 import com.project.smartparking.model.User;
 import com.project.smartparking.service.AuthService;
-import com.project.smartparking.repository.UserRepository;
+import com.project.smartparking.service.JwtService;
 
-import org.springframework.beans.factory.annotation.Autowired;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/auth")
@@ -23,46 +21,41 @@ public class AuthController {
     @Autowired
     private AuthService authService;
 
-    @Autowired                          
-    private UserRepository userRepository;
+    @Autowired
+    private JwtService jwtService;
 
     @PostMapping("/login")
     public ResponseEntity<?> login(@RequestBody LoginRequest request) {
 
-        boolean isValid = authService.login(
-                request.getEmail(),
-                request.getPassword()
-        );
+        User user = authService.loginUser(request.getEmail(), request.getPassword());
 
-        if (isValid) {
-            return ResponseEntity.ok("Login successful");
-        } else {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                    .body("Invalid email or password");
+        if (user != null) {
+            String token = jwtService.generateToken(user);
+            return ResponseEntity.ok(Map.of(
+                "token", token,
+                "role", user.getRole().name(),
+                "firstName", user.getFirstName() != null ? user.getFirstName() : ""
+            ));
         }
+
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                .body("Invalid email or password");
     }
 
-    @PostMapping("/signup")             
-    public ResponseEntity<?> signup(@RequestBody SignupRequest request) {  
+    @PostMapping("/signup")
+    public ResponseEntity<?> signup(@RequestBody SignupRequest request) {
 
-        if (!request.getPassword().equals(request.getVerifyPassword())) {
+        User savedUser = authService.signup(request);
+
+        if (savedUser == null) {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                    .body("Passwords do not match");   
+                    .body("Signup failed");
         }
 
-        if (userRepository.findByEmail(request.getEmail()).isPresent()) {  // ✅ Instance call
-            return ResponseEntity.status(HttpStatus.CONFLICT)
-                    .body("Email already exists");     
-        }
-
-        User newUser = new User();
-        newUser.setFirstName(request.getFirstName());
-        newUser.setLastName(request.getLastName());
-        newUser.setEmail(request.getEmail());
-        newUser.setPassword(request.getPassword());
-
-        User savedUser = userRepository.save(newUser);
-        return ResponseEntity.status(HttpStatus.CREATED).body(savedUser);
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(Map.of(
+                        "message", "Account created successfully",
+                        "userId", savedUser.getUserId()
+                ));
     }
-
 }

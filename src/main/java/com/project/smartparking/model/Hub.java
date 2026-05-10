@@ -1,30 +1,35 @@
 package com.project.smartparking.model;
+
 import jakarta.persistence.*;
 import lombok.*;
 
 @Entity
-@Table(name = "hubs")
+@Table(name = "transport_hubs")
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
 public class Hub {
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "hub_id")
-    private Long hub_id;
+    private Long hubId;
 
-    @Column(name = "name")
+    @Column(name = "name", nullable = false, length = 100)
     private String name;
 
-    @Column(name = "province")
+    @Column(name = "province", length = 50)
     private String province;
 
-    @Column(name = "district")
+    @Column(name = "district", length = 50)
     private String district;
 
-    @Column(name = "city")
+    @Column(name = "city", length = 50)
     private String city;
 
-    @Column(name = "gps_location")
-    private String gps_location; // Stored as "lat,long" string
+    @Column(name = "gps_location", length = 255)
+    private String gpsLocation; // Format: "lat,long"
+
+    @Column(name = "status", length = 30)
+    private String status; 
 }

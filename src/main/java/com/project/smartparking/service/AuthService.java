@@ -21,9 +21,8 @@ public class AuthService {
     private PasswordEncoder passwordEncoder;
 
     @Autowired
-    private JwtService jwtService;
+    private JwtService JwtService;
 
-    // ✅ returns full User so controller can extract role + firstName
     public User loginUser(String email, String password) {
         Optional<User> userOpt = userRepository.findByEmail(email);
         if (userOpt.isEmpty() || password == null) return null;
@@ -51,5 +50,9 @@ public class AuthService {
         newUser.setRole(User.Role.COMMUTER);
 
         return userRepository.save(newUser);
+    }
+
+    public User findUserByEmail(String email) {
+        return userRepository.findByEmail(email).orElse(null);
     }
 }

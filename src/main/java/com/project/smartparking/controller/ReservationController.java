@@ -1,12 +1,11 @@
 package com.project.smartparking.controller;
 
 import com.project.smartparking.model.Reservation;
-import com.project.smartparking.repository.ReservationRepository;
+import com.project.smartparking.service.ReservationService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import java.time.LocalDateTime;
 import java.util.List;
 
 @RestController
@@ -15,45 +14,67 @@ import java.util.List;
 public class ReservationController {
 
     @Autowired
-    private ReservationRepository reservationRepo;
+    private ReservationService reservationService;
 
-    // GET all reservations (for dashboard)
     @GetMapping
     public List<Reservation> getAll() {
-        return reservationRepo.findAll();
+        return reservationService.getAll();
     }
 
-    // CREATE reservation (user booking)
+    @GetMapping("/{id}")
+    public ResponseEntity<?> getById(@PathVariable Long id) {
+        return ResponseEntity.ok(reservationService.getById(id));
+    }
+
+    @GetMapping("/user/{userId}")
+    public List<Reservation> getByUser(@PathVariable Long userId) {
+        return reservationService.getByUser(userId);
+    }
+
     @PostMapping
-    public Reservation create(@RequestBody Reservation r) {
-        r.setBookingDate(LocalDateTime.now());
-        r.setStatus("PENDING");
-        return reservationRepo.save(r);
+    public ResponseEntity<?> create(@RequestBody Reservation r) {
+        return ResponseEntity.ok(reservationService.create(r));
     }
 
-    // CHECK-IN (gatekeeper)
+    @PutMapping("/{id}")
+    public ResponseEntity<?> update(@PathVariable Long id, @RequestBody Reservation updated) {
+        return ResponseEntity.ok(reservationService.update(id, updated));
+    }
+
+    @PutMapping("/{id}/cancel")
+    public ResponseEntity<?> cancel(@PathVariable Long id) {
+        reservationService.cancel(id);
+        return ResponseEntity.ok("Cancelled successfully");
+    }
+
+    @DeleteMapping("/{id}")
+    public ResponseEntity<?> delete(@PathVariable Long id) {
+        reservationService.delete(id);
+        return ResponseEntity.ok("Deleted successfully");
+    }
+
+    @PutMapping("/{id}/confirm-payment")
+    public ResponseEntity<?> confirmPayment(@PathVariable Long id) {
+        return ResponseEntity.ok(reservationService.confirmPayment(id));
+    }
+
+    @PutMapping("/checkin")
+    public ResponseEntity<?> checkInByCode(@RequestParam String code) {
+        return ResponseEntity.ok(reservationService.checkInByCode(code));
+    }
+
     @PutMapping("/{id}/checkin")
-    public ResponseEntity<?> checkIn(@PathVariable Long id) {
-
-        Reservation r = reservationRepo.findById(id)
-                .orElseThrow();
-
-        r.setActualIn(LocalDateTime.now());
-        r.setStatus("CHECKED_IN");
-
-        return ResponseEntity.ok(reservationRepo.save(r));
+    public ResponseEntity<?> checkInById(@PathVariable Long id) {
+        return ResponseEntity.ok(reservationService.checkInById(id));
     }
 
-    // CHECK-OUT (gatekeeper)
     @PutMapping("/{id}/checkout")
     public ResponseEntity<?> checkOut(@PathVariable Long id) {
+        return ResponseEntity.ok(reservationService.checkOut(id));
+    }
 
-        Reservation r = reservationRepo.findById(id)
-                .orElseThrow();
-
-        r.setActualOut(LocalDateTime.now());
-        r.setStatus("COMPLETED");
-
-        return ResponseEntity.ok(reservationRepo.save(r));
+    @PutMapping("/{id}/paid")
+    public ResponseEntity<?> markPaid(@PathVariable Long id) {
+        return ResponseEntity.ok(reservationService.markPaid(id));
     }
 }

@@ -30,6 +30,7 @@ public class ParkingSlot {
     @Column(name = "sensor_id")
     private Long sensorId;
 
+
     public enum SlotStatus {
         AVAILABLE,
         RESERVED,

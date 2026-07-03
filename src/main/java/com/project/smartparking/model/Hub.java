@@ -28,7 +28,7 @@ public class Hub {
     private String city;
 
     @Column(name = "gps_location", length = 255)
-    private String gpsLocation; // Format: "lat,long"
+    private String gpsLocation;
 
     @Column(name = "status", length = 30)
     private String status; 

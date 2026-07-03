@@ -32,9 +32,10 @@ public class AuthController {
         if (user != null) {
             String token = jwtService.generateToken(user);
             return ResponseEntity.ok(Map.of(
-                "token", token,
-                "role", user.getRole().name(),
-                "firstName", user.getFirstName() != null ? user.getFirstName() : ""
+                    "token", token,
+                    "role", user.getRole().name(),
+                    "firstName", user.getFirstName() != null ? user.getFirstName() : "",
+                    "userId", user.getUserId()
             ));
         }
 
@@ -55,7 +56,38 @@ public class AuthController {
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(Map.of(
                         "message", "Account created successfully",
-                        "userId", savedUser.getUserId()
+                        "userId", savedUser.getUserId()));
+    }
+    @GetMapping("/me")
+    public ResponseEntity<?> getCurrentUser(
+            @RequestHeader(value = "Authorization", required = false) String bearerToken
+    ) {
+        if (bearerToken == null || !bearerToken.startsWith("Bearer ")) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                    .body("Missing or invalid token structure");
+        }
+
+                    String token = bearerToken.substring(7);
+
+        try {
+            
+            String email = jwtService.extractEmail(token); 
+
+            User user = authService.findUserByEmail(email); 
+
+            if (user != null) {
+                return ResponseEntity.ok(Map.of(
+                        "userId", user.getUserId(),
+                        "email", user.getEmail(),
+                        "role", user.getRole().name(),
+                        "firstName", user.getFirstName() != null ? user.getFirstName() : ""
                 ));
+            }
+
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("User not found");
+
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Invalid or expired token");
+        }
     }
 }

@@ -30,8 +30,8 @@ public class DashboardController {
             return ResponseEntity.ok("ADMIN DASHBOARD");
         }
 
-        if (role == Role.STAFF) {
-            return ResponseEntity.ok("STAFF DASHBOARD");
+        if (role == Role.ATTENDANT) {
+            return ResponseEntity.ok("ATTENDANT DASHBOARD");
         }
 
         return ResponseEntity.ok("USER DASHBOARD");

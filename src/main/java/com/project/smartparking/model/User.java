@@ -41,7 +41,6 @@ public class User {
     @Column(name = "created_at")
     private Timestamp createdAt;
 
-    // DO NOT add any manual getters/setters - Lombok handles all of them
 
     public enum Role {
         ADMIN,

@@ -14,9 +14,19 @@ public interface ParkingSlotRepository extends JpaRepository<ParkingSlot, Long> 
 
     List<ParkingSlot> findByStatus(ParkingSlot.SlotStatus status);
 
+    void deleteByLotId(Long lotId);
+
+    List<ParkingSlot> findByLotId(Long lotId); // ✅ add this
+
     @Query(value = "SELECT s.* FROM parking_slots s " +
            "JOIN parking_lots l ON s.lot_id = l.lot_id " +
-           "WHERE l.hub_id = :hubId AND s.status = 'AVAILABLE'", 
+           "WHERE l.hub_id = :hubId",
+           nativeQuery = true)
+    List<ParkingSlot> findByHub(@Param("hubId") Long hubId);
+
+    @Query(value = "SELECT s.* FROM parking_slots s " +
+           "JOIN parking_lots l ON s.lot_id = l.lot_id " +
+           "WHERE l.hub_id = :hubId AND s.status = 'AVAILABLE'",
            nativeQuery = true)
     List<ParkingSlot> findAvailableByHub(@Param("hubId") Long hubId);
 }

@@ -50,6 +50,9 @@ public class Reservation {
     @Column(name = "reservation_type")
     private String reservationType;
 
+    @Column(name = "reservation_fee")
+    private Double reservationFee;
+
     @PrePersist
     protected void onCreate() {
         this.bookingDate = LocalDateTime.now();

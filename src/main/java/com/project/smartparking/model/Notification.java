@@ -1,4 +1,5 @@
 package com.project.smartparking.model;
+
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Data;
@@ -12,13 +13,14 @@ import java.time.LocalDateTime;
 @NoArgsConstructor
 @AllArgsConstructor
 public class Notification {
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "notification_id")
-    private Long notification_id;
+    private Long notificationId;
 
     @Column(name = "user_id")
-    private Long user_id;
+    private Long userId;
 
     @Column(name = "title")
     private String title;
@@ -27,16 +29,16 @@ public class Notification {
     private String message;
 
     @Column(name = "created_at")
-    private Timestamp created_at;
+    private Timestamp createdAt;
 
     @Column(name = "is_read")
-    private boolean is_read;
-     // tinyint(1) maps to boolean in Java
-    @Column(name = "notification_type")
-    private String notification_type; // EMAIL, SMS, SYSTEM
+    private boolean read;
 
-     @PrePersist
+    @Column(name = "notification_type")
+    private String notificationType;
+
+    @PrePersist
     protected void onCreate() {
-        this.created_at = Timestamp.valueOf(LocalDateTime.now());
+        this.createdAt = Timestamp.valueOf(LocalDateTime.now());
     }
 }

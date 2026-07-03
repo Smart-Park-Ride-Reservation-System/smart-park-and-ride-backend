@@ -16,7 +16,7 @@ public class UserController {
     @Autowired
     private AuthRepository repo;
 
-    // GET ALL USERS
+    // GET
     @GetMapping
     public List<User> getAllUsers() {
         return repo.findAll();

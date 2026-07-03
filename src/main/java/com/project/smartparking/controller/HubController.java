@@ -16,7 +16,6 @@ public class HubController {
     @Autowired
     private HubRepository repo;
 
-    // GET ALL HUBS
     @GetMapping
     public List<Hub> getAll() {
         return repo.findAll();

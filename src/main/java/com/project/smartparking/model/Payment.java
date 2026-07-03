@@ -28,7 +28,7 @@ public class Payment {
     private LocalDateTime paymentDate;
 
     @Column(name = "payment_status")
-    private String paymentStatus; // PENDING, SUCCESS, FAILED, REFUNDED
+    private String paymentStatus; // PENDING, SUCCESS, FAILED
 
     @Column(name = "payment_method")
     private String paymentMethod; // CARD, PAYHERE, CASH

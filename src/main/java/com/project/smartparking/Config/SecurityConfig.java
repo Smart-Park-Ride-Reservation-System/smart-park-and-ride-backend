@@ -28,7 +28,8 @@ public class SecurityConfig {
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
         configuration.setAllowedOrigins(List.of("http://localhost:3000"));
-        configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
+        configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
+
         configuration.setAllowedHeaders(List.of("*"));
         configuration.setAllowCredentials(true);
 
@@ -44,6 +45,7 @@ public class SecurityConfig {
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
+                        .requestMatchers("/").permitAll()
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         .requestMatchers("/api/auth/**").permitAll()
 
@@ -67,6 +69,8 @@ public class SecurityConfig {
 
                         .requestMatchers("/api/users/**").hasRole("ADMIN")
                         .requestMatchers("/api/hubs/**").permitAll()
+                        .requestMatchers("/api/ai-insights").hasRole("ADMIN")
+
 
                         .anyRequest().authenticated())
                 .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);

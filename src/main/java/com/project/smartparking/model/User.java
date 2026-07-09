@@ -41,14 +41,14 @@ public class User {
     @Column(name = "created_at")
     private Timestamp createdAt;
 
-
     public enum Role {
         ADMIN,
         ATTENDANT,
         COMMUTER,;
 
         public static Role fromString(String role) {
-            if (role == null) return COMMUTER;
+            if (role == null)
+                return COMMUTER;
             try {
                 return Role.valueOf(role.trim().toUpperCase());
             } catch (IllegalArgumentException e) {
@@ -56,4 +56,8 @@ public class User {
             }
         }
     }
+
+    @ManyToOne
+    @JoinColumn(name = "hub_id")
+    private Hub hub;
 }

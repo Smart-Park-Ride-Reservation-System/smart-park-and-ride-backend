@@ -53,9 +53,14 @@ public class Reservation {
     @Column(name = "reservation_fee")
     private Double reservationFee;
 
+
+    @Column(name = "reminder_sent")
+    private Boolean reminderSent = false;
+
     @PrePersist
     protected void onCreate() {
         this.bookingDate = LocalDateTime.now();
-        if (this.status == null) this.status = "PENDING";
+        if (this.status == null)
+            this.status = "PENDING";
     }
 }

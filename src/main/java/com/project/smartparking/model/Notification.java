@@ -41,4 +41,5 @@ public class Notification {
     protected void onCreate() {
         this.createdAt = Timestamp.valueOf(LocalDateTime.now());
     }
+    
 }

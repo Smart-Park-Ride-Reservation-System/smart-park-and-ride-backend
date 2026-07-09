@@ -18,6 +18,7 @@ public interface ReservationRepository extends JpaRepository<Reservation, Long> 
         List<Reservation> findBySlotId(Long slotId);
 
         List<Reservation> findByStatus(String status);
+        List<Reservation> findByScheduledInBetweenAndReminderSentFalse(LocalDateTime start, LocalDateTime end);
 
         List<Reservation> findByStatusAndScheduledInBeforeAndActualInIsNull(
                         String status,

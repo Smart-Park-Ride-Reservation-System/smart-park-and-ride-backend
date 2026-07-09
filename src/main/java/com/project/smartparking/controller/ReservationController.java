@@ -60,7 +60,7 @@ public class ReservationController {
 
     @PutMapping("/checkin")
     public ResponseEntity<?> checkInByCode(@RequestParam String code) {
-        return ResponseEntity.ok(reservationService.checkInByCode(code));
+        return ResponseEntity.ok(reservationService.checkInByQrToken(code));
     }
 
     @PutMapping("/{id}/checkin")

@@ -1,13 +1,16 @@
 package com.project.smartparking.service;
 
 import com.project.smartparking.model.ParkingSlot;
+import com.project.smartparking.model.Payment;
 import com.project.smartparking.model.Reservation;
 import com.project.smartparking.repository.ParkingSlotRepository;
+import com.project.smartparking.repository.PaymentRepository;
 import com.project.smartparking.repository.ReservationRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
@@ -17,7 +20,8 @@ public class ReservationService {
 
     @Autowired
     private ReservationRepository reservationRepo;
-
+    @Autowired
+    private PaymentRepository paymentRepo;
     @Autowired
     private ParkingSlotRepository slotRepo;
 
@@ -115,13 +119,12 @@ public class ReservationService {
         return reservationRepo.save(r);
     }
 
-    public Reservation checkInByCode(String code) {
-        Reservation r = reservationRepo
-                .findByQrTokenSuffix(code.toUpperCase())
-                .orElseThrow(() -> new IllegalArgumentException("Invalid code"));
+    public Reservation checkInByQrToken(String qrToken) {
+        Reservation r = reservationRepo.findByQrToken(qrToken)
+                .orElseThrow(() -> new IllegalArgumentException("Invalid QR code"));
 
         if (!"CONFIRMED".equals(r.getStatus())) {
-            throw new IllegalStateException("Not in valid state for check-in");
+            throw new IllegalStateException("Not in valid state for check-in: " + r.getStatus());
         }
 
         r.setActualIn(LocalDateTime.now());
@@ -175,11 +178,51 @@ public class ReservationService {
         Reservation r = getById(id);
 
         if (!"COMPLETED".equals(r.getStatus())) {
-            throw new IllegalStateException("Only COMPLETED reservations can be marked paid");
+            throw new IllegalStateException("Only COMPLETED reservations can be marked as paid");
         }
+
+        double calculatedAmount = calculateParkingCharge(r);
+
+        Payment payment = new Payment();
+        payment.setReservationId(r.getReservationId());
+        payment.setAmount(BigDecimal.valueOf(calculatedAmount));
+        payment.setPaymentMethod("CASH");
+        payment.setPaymentStatus("SUCCESS");
+
+        paymentRepo.save(payment);
 
         r.setStatus("PAID");
         return reservationRepo.save(r);
+    }
+
+    private double calculateParkingCharge(Reservation r) {
+        // Proportional per-minute billing (NOT rounded up to the full hour).
+        // Must stay in sync with the frontend's calcAmount() in dashboard/page.tsx —
+        // both compute hours = elapsedMillis / (1000*60*60), then hours * rate,
+        // rounded up to the nearest cent (not the nearest hour).
+        long millis = java.time.Duration.between(r.getActualIn(), r.getActualOut()).toMillis();
+        double hours = millis / (1000.0 * 60.0 * 60.0);
+
+        double rate;
+        switch (r.getVehicleType().toUpperCase()) {
+            case "BIKE":
+                rate = 50;
+                break;
+            case "CAR":
+                rate = 100;
+                break;
+            case "SUV":
+                rate = 130;
+                break;
+            case "VAN":
+                rate = 150;
+                break;
+            default:
+                rate = 100;
+        }
+
+        double amount = hours * rate;
+        return Math.ceil(amount * 100) / 100.0; // round to nearest cent, same as frontend
     }
 
     @Scheduled(fixedRate = 30000)

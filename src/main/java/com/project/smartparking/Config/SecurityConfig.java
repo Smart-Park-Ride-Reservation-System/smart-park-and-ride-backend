@@ -70,8 +70,11 @@ public class SecurityConfig {
                         .requestMatchers("/api/users/**").hasRole("ADMIN")
                         .requestMatchers("/api/hubs/**").permitAll()
                         .requestMatchers("/api/ai-insights").hasRole("ADMIN")
-
-
+                        
+                        .requestMatchers(HttpMethod.GET, "/api/subscriptions/**").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/subscriptions/**").permitAll()
+                        .requestMatchers(HttpMethod.PUT, "/api/subscriptions/**").permitAll()
+                        .requestMatchers(HttpMethod.DELETE, "/api/subscriptions/**").permitAll()
                         .anyRequest().authenticated())
                 .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
 

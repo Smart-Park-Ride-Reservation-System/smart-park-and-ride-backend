@@ -2,7 +2,7 @@ package com.project.smartparking.controller;
 
 import com.project.smartparking.dto.AiInsightsDtos.AiInsightsRequest;
 import com.project.smartparking.dto.AiInsightsDtos.AiInsightsResponse;
-import com.project.smartparking.service.GeminiInsightsService;
+import com.project.smartparking.service.GroqInsightsService;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -13,10 +13,10 @@ import java.util.Map;
 @RequestMapping("/api/ai-insights")
 public class AiInsightsController {
 
-    private final GeminiInsightsService geminiInsightsService;
+    private final GroqInsightsService groqInsightsService;
 
-    public AiInsightsController(GeminiInsightsService geminiInsightsService) {
-        this.geminiInsightsService = geminiInsightsService;
+    public AiInsightsController(GroqInsightsService groqInsightsService) {
+        this.groqInsightsService = groqInsightsService;
     }
 
     // Secure this the same way your other admin-only endpoints are secured —
@@ -25,9 +25,9 @@ public class AiInsightsController {
     @PostMapping
     public ResponseEntity<?> getInsights(@RequestBody AiInsightsRequest request) {
         try {
-            AiInsightsResponse insights = geminiInsightsService.generateInsights(request);
+            AiInsightsResponse insights = groqInsightsService.generateInsights(request);
             return ResponseEntity.ok(insights);
-        } catch (GeminiInsightsService.AiInsightsException e) {
+        } catch (GroqInsightsService.AiInsightsException e) {
             return ResponseEntity.status(HttpStatus.BAD_GATEWAY)
                     .body(Map.of("error", e.getMessage()));
         } catch (Exception e) {
@@ -36,3 +36,4 @@ public class AiInsightsController {
         }
     }
 }
+

@@ -1,5 +1,3 @@
-// Place in your service package, e.g. com.project.smartparking.service
-
 package com.project.smartparking.service;
 
 import com.project.smartparking.dto.AiInsightsDtos.AiInsightsRequest;
@@ -22,17 +20,15 @@ import java.util.List;
 import java.util.Map;
 
 @Service
-public class GeminiInsightsService {
+public class GroqInsightsService {
 
-    private static final Logger log = LoggerFactory.getLogger(GeminiInsightsService.class);
+    private static final Logger log = LoggerFactory.getLogger(GroqInsightsService.class);
 
-    // Free tier — get a key at https://aistudio.google.com/apikey (no card required)
-    @Value("${gemini.api.key}")
-    private String geminiApiKey;
+    @Value("${groq.api.key}")
+    private String groqApiKey;
 
-    private static final String GEMINI_MODEL = "gemini-2.0-flash";
-    private static final String GEMINI_URL =
-            "https://generativelanguage.googleapis.com/v1beta/models/" + GEMINI_MODEL + ":generateContent";
+    private static final String GROQ_MODEL = "llama-3.1-8b-instant";
+    private static final String GROQ_URL = "https://api.groq.com/openai/v1/chat/completions";
 
     private static final String RESPONSE_SCHEMA = """
         {
@@ -54,14 +50,13 @@ public class GeminiInsightsService {
     private final RestTemplate restTemplate;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
-    // Simple in-memory cache: same aggregated payload within this window
-    // reuses the last AI response instead of calling Gemini again.
-    private static final long CACHE_TTL_MILLIS = 2 * 60 * 1000; // 2 minutes
+    // Simple in-memory cache
+    private static final long CACHE_TTL_MILLIS = 2 * 60 * 1000;
     private final java.util.Map<String, CacheEntry> cache = new java.util.concurrent.ConcurrentHashMap<>();
 
     private record CacheEntry(AiInsightsResponse response, long timestamp) {}
 
-    public GeminiInsightsService(RestTemplate restTemplate) {
+    public GroqInsightsService(RestTemplate restTemplate) {
         this.restTemplate = restTemplate;
     }
 
@@ -75,21 +70,22 @@ public class GeminiInsightsService {
         String prompt = buildPrompt(request);
 
         Map<String, Object> body = Map.of(
-                "contents", List.of(Map.of(
+                "model", GROQ_MODEL,
+                "messages", List.of(Map.of(
                         "role", "user",
-                        "parts", List.of(Map.of("text", prompt))
+                        "content", prompt
                 )),
-                "generationConfig", Map.of(
-                        "temperature", 0.3,
-                        "responseMimeType", "application/json"
-                )
+                "temperature", 0.3,
+                "response_format", Map.of("type", "json_object")
         );
 
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
+        headers.setBearerAuth(groqApiKey);
+        
         HttpEntity<Map<String, Object>> entity = new HttpEntity<>(body, headers);
 
-        String url = GEMINI_URL + "?key=" + geminiApiKey;
+        String url = GROQ_URL;
 
         ResponseEntity<String> response = null;
         int maxAttempts = 3;
@@ -102,7 +98,7 @@ public class GeminiInsightsService {
             } catch (HttpClientErrorException.TooManyRequests e) {
                 if (attempt == maxAttempts) {
                     throw new AiInsightsException(
-                            "AI provider rate limit hit — try again in a minute (free tier quota)", e);
+                            "AI provider rate limit hit — try again in a minute", e);
                 }
                 try {
                     Thread.sleep(backoffMillis * attempt);
@@ -110,11 +106,11 @@ public class GeminiInsightsService {
                     Thread.currentThread().interrupt();
                 }
             } catch (HttpClientErrorException e) {
-                log.error("Gemini API error — status: {}, body: {}", e.getStatusCode(), e.getResponseBodyAsString());
+                log.error("Groq API error — status: {}, body: {}", e.getStatusCode(), e.getResponseBodyAsString());
                 throw new AiInsightsException(
-                    "Gemini error " + e.getStatusCode() + ": " + e.getResponseBodyAsString(), e);
+                    "Groq error " + e.getStatusCode() + ": " + e.getResponseBodyAsString(), e);
             } catch (RestClientException e) {
-                log.error("Gemini API request failed", e);
+                log.error("Groq API request failed", e);
                 throw new AiInsightsException("AI provider request failed: " + e.getMessage(), e);
             }
         }
@@ -125,13 +121,13 @@ public class GeminiInsightsService {
         }
 
         JsonNode root = objectMapper.readTree(response.getBody());
-        JsonNode textNode = root.path("candidates").path(0).path("content").path("parts").path(0).path("text");
+        JsonNode messageNode = root.path("choices").path(0).path("message").path("content");
 
-        if (textNode.isMissingNode() || textNode.asText().isBlank()) {
+        if (messageNode.isMissingNode() || messageNode.asText().isBlank()) {
             throw new AiInsightsException("AI provider returned an empty response");
         }
 
-        String cleaned = textNode.asText()
+        String cleaned = messageNode.asText()
                 .replace("```json", "")
                 .replace("```", "")
                 .trim();
@@ -165,6 +161,7 @@ public class GeminiInsightsService {
               slot or vehicle type dominating usage, an elevated failed/pending payment rate).
             - The forecast should extrapolate from the current vs. previous period trend
               in "growth". If previous-period data is missing or zero, say confidence is "low".
+            - Important: Please format your response as a valid JSON object matching the schema.
 
             DATA:
             %s

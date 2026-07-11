@@ -24,6 +24,8 @@ public class ReservationService {
     private PaymentRepository paymentRepo;
     @Autowired
     private ParkingSlotRepository slotRepo;
+    @Autowired
+    private SubscriptionService subscriptionService;
 
     public List<Reservation> getAll() {
         return reservationRepo.findAll();
@@ -196,6 +198,11 @@ public class ReservationService {
     }
 
     private double calculateParkingCharge(Reservation r) {
+        // If the user has an active subscription, parking is fully covered (100% discount).
+        if (subscriptionService.getActiveSubscription(r.getUserId()) != null) {
+            return 0.0;
+        }
+
         // Proportional per-minute billing (NOT rounded up to the full hour).
         // Must stay in sync with the frontend's calcAmount() in dashboard/page.tsx —
         // both compute hours = elapsedMillis / (1000*60*60), then hours * rate,

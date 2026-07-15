@@ -10,7 +10,6 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/api/hubs")
-@CrossOrigin(origins = "http://localhost:3000")
 public class HubController {
 
     @Autowired

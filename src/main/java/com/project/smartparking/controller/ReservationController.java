@@ -10,7 +10,6 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/api/reservations")
-@CrossOrigin(origins = "http://localhost:3000")
 public class ReservationController {
 
     @Autowired
@@ -76,5 +75,15 @@ public class ReservationController {
     @PutMapping("/{id}/paid")
     public ResponseEntity<?> markPaid(@PathVariable Long id) {
         return ResponseEntity.ok(reservationService.markPaid(id));
+    }
+
+    @PutMapping("/gate-a/scan") // ENTRY — always check-in
+    public ResponseEntity<?> gateAScan(@RequestParam String qrToken) {
+        return ResponseEntity.ok(reservationService.checkInByQrToken(qrToken));
+    }
+
+    @PutMapping("/gate-b/scan") // EXIT — always check-out
+    public ResponseEntity<?> gateBScan(@RequestParam String qrToken) {
+        return ResponseEntity.ok(reservationService.checkOutByQrToken(qrToken));
     }
 }

@@ -36,11 +36,9 @@ public class SubscriptionService {
     }
 
     public UserSubscription getActiveSubscription(Long userId) {
-        // Find if user has a currently active subscription
         Optional<UserSubscription> activeSub = userSubscriptionRepository.findFirstByUser_UserIdAndStatusOrderByEndDateDesc(userId, "ACTIVE");
         if (activeSub.isPresent()) {
             UserSubscription sub = activeSub.get();
-            // Check if it's expired
             if (sub.getEndDate().before(new Timestamp(System.currentTimeMillis()))) {
                 sub.setStatus("EXPIRED");
                 userSubscriptionRepository.save(sub);
@@ -58,8 +56,7 @@ public class SubscriptionService {
         SubscriptionPackage subPackage = packageRepository.findById(request.getPackageId())
                 .orElseThrow(() -> new RuntimeException("Package not found"));
 
-        // If user already has an active subscription, expire it or just add the new one starting today.
-        // For simplicity, we just start the new one from now.
+       
         UserSubscription existing = getActiveSubscription(user.getUserId());
         if (existing != null) {
             existing.setStatus("EXPIRED");

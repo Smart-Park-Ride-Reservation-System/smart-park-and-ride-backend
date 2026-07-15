@@ -12,6 +12,7 @@ import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 import java.util.List;
 
@@ -24,12 +25,14 @@ public class SecurityConfig {
         return new BCryptPasswordEncoder();
     }
 
+    @Value("${cors.allowed.origins}")
+    private String allowedOrigins;
+
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
-        configuration.setAllowedOrigins(List.of("http://localhost:3000"));
+        configuration.setAllowedOrigins(List.of(allowedOrigins.split(",")));
         configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
-
         configuration.setAllowedHeaders(List.of("*"));
         configuration.setAllowCredentials(true);
 
@@ -50,7 +53,7 @@ public class SecurityConfig {
                         .requestMatchers("/api/auth/**").permitAll()
 
                         .requestMatchers(HttpMethod.POST, "/api/slots/generate").hasRole("ADMIN")
-                        .requestMatchers(HttpMethod.GET, "/api/slots/search").hasAnyRole("ADMIN", "COMMUTER")
+                        .requestMatchers(HttpMethod.GET, "/api/slots/search").permitAll()
                         .requestMatchers("/api/slots/**").permitAll()
 
                         .requestMatchers(HttpMethod.GET, "/api/reservations", "/api/reservations/**").permitAll()
@@ -70,7 +73,7 @@ public class SecurityConfig {
                         .requestMatchers("/api/users/**").hasRole("ADMIN")
                         .requestMatchers("/api/hubs/**").permitAll()
                         .requestMatchers("/api/ai-insights").hasRole("ADMIN")
-                        
+
                         .requestMatchers(HttpMethod.GET, "/api/subscriptions/**").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/subscriptions/**").permitAll()
                         .requestMatchers(HttpMethod.PUT, "/api/subscriptions/**").permitAll()

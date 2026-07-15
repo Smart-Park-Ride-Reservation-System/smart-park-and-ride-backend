@@ -90,8 +90,7 @@ public class PayHereService {
                 .orElseThrow(() -> new RuntimeException("Reservation not found"));
 
         if ("2".equals(statusCode)) {
-            // Reservation fee paid successfully — store it on the reservation itself,
-            // NOT in the payment table. Payment.amount is reserved for markPaid().
+           
             if ("PENDING".equals(r.getStatus())) {
                 r.setReservationFee(Double.parseDouble(amount));
                 r.setStatus("CONFIRMED");

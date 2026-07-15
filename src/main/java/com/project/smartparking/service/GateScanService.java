@@ -1,0 +1,111 @@
+package com.project.smartparking.service;
+
+import com.google.firebase.database.DatabaseReference;
+import com.google.firebase.database.FirebaseDatabase;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.stereotype.Service;
+import org.springframework.web.bind.annotation.*;
+
+import java.sql.Timestamp;
+import java.time.Instant;
+import java.util.List;
+
+/**
+ * Handles QR-scan events from the gatekeeper's phone (web scanner UI).
+ *
+ * Two gates, same reservation record:
+ *   - ENTRY gate scan  -> reservation: PENDING     -> CHECKED_IN
+ *   - EXIT  gate scan  -> reservation: CHECKED_IN   -> COMPLETED
+ *
+ * On a valid transition, we pulse the matching servo via Firebase.
+ * The IR sensor is completely separate — it only reports slot
+ * occupancy for live status/telemetry, and never changes reservation
+ * state.
+ *
+ * Firebase Realtime DB paths used:
+ *   /gates/{gateId}/open   -> boolean, hardware watches this and pulses servo
+ */
+@Service
+public class GateScanService {
+
+    private final JdbcTemplate jdbcTemplate;
+
+    public GateScanService(JdbcTemplate jdbcTemplate) {
+        this.jdbcTemplate = jdbcTemplate;
+    }
+
+    public ScanResult handleScan(String qrToken, String gateId, GateType gateType) {
+        Reservation reservation = findReservationByToken(qrToken);
+
+        if (reservation == null) {
+            return ScanResult.rejected("QR code not recognized");
+        }
+
+        return switch (gateType) {
+            case ENTRY -> handleEntry(reservation, gateId);
+            case EXIT -> handleExit(reservation, gateId);
+        };
+    }
+
+    private ScanResult handleEntry(Reservation reservation, String gateId) {
+        if (!"PENDING".equals(reservation.status())) {
+            return ScanResult.rejected(
+                "Reservation is not pending (current status: " + reservation.status() + ")");
+        }
+
+        jdbcTemplate.update(
+            "UPDATE reservations SET status = 'CHECKED_IN', checkin_time = ? WHERE id = ?",
+            Timestamp.from(Instant.now()), reservation.id());
+
+        openGate(gateId);
+
+        return ScanResult.success("Checked in — slot " + reservation.slotId(), reservation.id());
+    }
+
+    private ScanResult handleExit(Reservation reservation, String gateId) {
+        if (!"CHECKED_IN".equals(reservation.status())) {
+            return ScanResult.rejected(
+                "Reservation is not checked in (current status: " + reservation.status() + ")");
+        }
+
+        jdbcTemplate.update(
+            "UPDATE reservations SET status = 'COMPLETED', checkout_time = ? WHERE id = ?",
+            Timestamp.from(Instant.now()), reservation.id());
+
+        openGate(gateId);
+
+        return ScanResult.success("Checked out — slot " + reservation.slotId(), reservation.id());
+    }
+
+    private Reservation findReservationByToken(String qrToken) {
+        String sql = "SELECT id, slot_id, status FROM reservations WHERE qr_token = ?";
+        List<Reservation> results = jdbcTemplate.query(sql,
+            (rs, rowNum) -> new Reservation(
+                rs.getLong("id"),
+                rs.getString("slot_id"),
+                rs.getString("status")),
+            qrToken);
+
+        return results.isEmpty() ? null : results.get(0);
+    }
+
+    /** Pulses the gate open via Firebase; hardware resets it after the servo cycle. */
+    private void openGate(String gateId) {
+        DatabaseReference gateRef = FirebaseDatabase.getInstance()
+            .getReference("gates/" + gateId + "/open");
+        gateRef.setValueAsync(true);
+    }
+
+    public enum GateType { ENTRY, EXIT }
+
+    public record Reservation(Long id, String slotId, String status) {}
+
+    public record ScanResult(boolean ok, String message, Long reservationId) {
+        static ScanResult success(String message, Long reservationId) {
+            return new ScanResult(true, message, reservationId);
+        }
+        static ScanResult rejected(String message) {
+            return new ScanResult(false, message, null);
+        }
+    }
+}

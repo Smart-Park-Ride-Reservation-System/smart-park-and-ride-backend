@@ -9,19 +9,16 @@ import java.util.Map;
 
 @RestController
 @RequestMapping("/api/payments/payhere")
-@CrossOrigin(origins = "http://localhost:3000")
 public class PayHereController {
 
     @Autowired
     private PayHereService payHereService;
 
-    // Called by frontend to get checkout fields + hash
     @GetMapping("/init")
     public ResponseEntity<Map<String, String>> init(@RequestParam Long reservationId) {
         return ResponseEntity.ok(payHereService.buildCheckoutFields(reservationId));
     }
 
-    // Called by PayHere after payment — no JWT, must be public
     @PostMapping("/notify")
     public ResponseEntity<String> notify(
             @RequestParam("merchant_id")      String merchantId,

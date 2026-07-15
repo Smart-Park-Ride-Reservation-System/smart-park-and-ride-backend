@@ -198,15 +198,12 @@ public class ReservationService {
     }
 
     private double calculateParkingCharge(Reservation r) {
-        // If the user has an active subscription, parking is fully covered (100% discount).
+        
         if (subscriptionService.getActiveSubscription(r.getUserId()) != null) {
             return 0.0;
         }
 
-        // Proportional per-minute billing (NOT rounded up to the full hour).
-        // Must stay in sync with the frontend's calcAmount() in dashboard/page.tsx —
-        // both compute hours = elapsedMillis / (1000*60*60), then hours * rate,
-        // rounded up to the nearest cent (not the nearest hour).
+        
         long millis = java.time.Duration.between(r.getActualIn(), r.getActualOut()).toMillis();
         double hours = millis / (1000.0 * 60.0 * 60.0);
 
@@ -229,17 +226,13 @@ public class ReservationService {
         }
 
         double amount = hours * rate;
-        return Math.ceil(amount * 100) / 100.0; // round to nearest cent, same as frontend
+        return Math.ceil(amount * 100) / 100.0; 
     }
 
     @Scheduled(fixedRate = 30000)
     public void expireStaleReservations() {
         LocalDateTime now = LocalDateTime.now();
 
-        // Grace period is measured from the user's SCHEDULED slot time (scheduledIn),
-        // not from when the reservation record was created (bookingDate).
-        // A reservation made well ahead of time for a future slot must not expire
-        // before that slot's actual start time + grace period arrives.
         reservationRepo
                 .findByStatusAndScheduledInBeforeAndActualInIsNull("PENDING", now.minusMinutes(15))
                 .forEach(this::expire);
@@ -288,5 +281,39 @@ public class ReservationService {
                 slotRepo.save(slot);
             });
         }
+    }
+
+    public Reservation checkOutByQrToken(String qrToken) {
+        Reservation r = reservationRepo.findByQrToken(qrToken)
+                .orElseThrow(() -> new IllegalArgumentException("Invalid QR code"));
+
+        if (!"CHECKED_IN".equals(r.getStatus())) {
+            throw new IllegalStateException("Not in valid state for check-out: " + r.getStatus());
+        }
+
+        r.setActualOut(LocalDateTime.now());
+        r.setStatus("COMPLETED");
+
+        slotRepo.findById(r.getSlotId()).ifPresent(slot -> {
+            slot.setStatus(ParkingSlot.SlotStatus.AVAILABLE);
+            slotRepo.save(slot);
+        });
+
+        return reservationRepo.save(r);
+    }
+
+    
+    public Reservation processQrScan(String qrToken) {
+        Reservation r = reservationRepo.findByQrToken(qrToken)
+                .orElseThrow(() -> new IllegalArgumentException("Invalid QR code"));
+
+        return switch (r.getStatus()) {
+            case "CONFIRMED" -> checkInByQrToken(qrToken);
+            case "CHECKED_IN" -> checkOutByQrToken(qrToken);
+            case "COMPLETED", "PAID" -> throw new IllegalStateException("Already checked out.");
+            case "EXPIRED", "CANCELLED" ->
+                throw new IllegalStateException("Reservation is no longer valid: " + r.getStatus());
+            default -> throw new IllegalStateException("Unexpected status: " + r.getStatus());
+        };
     }
 }

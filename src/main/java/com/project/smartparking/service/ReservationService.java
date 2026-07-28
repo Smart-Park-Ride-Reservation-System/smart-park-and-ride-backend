@@ -198,12 +198,11 @@ public class ReservationService {
     }
 
     private double calculateParkingCharge(Reservation r) {
-        
+
         if (subscriptionService.getActiveSubscription(r.getUserId()) != null) {
             return 0.0;
         }
 
-        
         long millis = java.time.Duration.between(r.getActualIn(), r.getActualOut()).toMillis();
         double hours = millis / (1000.0 * 60.0 * 60.0);
 
@@ -226,7 +225,7 @@ public class ReservationService {
         }
 
         double amount = hours * rate;
-        return Math.ceil(amount * 100) / 100.0; 
+        return Math.ceil(amount * 100) / 100.0;
     }
 
     @Scheduled(fixedRate = 30000)
@@ -234,7 +233,7 @@ public class ReservationService {
         LocalDateTime now = LocalDateTime.now();
 
         reservationRepo
-                .findByStatusAndScheduledInBeforeAndActualInIsNull("PENDING", now.minusMinutes(15))
+                .findByStatusAndScheduledInBeforeAndActualInIsNull("PENDING", now.minusMinutes(10))
                 .forEach(this::expire);
 
         reservationRepo
@@ -302,7 +301,6 @@ public class ReservationService {
         return reservationRepo.save(r);
     }
 
-    
     public Reservation processQrScan(String qrToken) {
         Reservation r = reservationRepo.findByQrToken(qrToken)
                 .orElseThrow(() -> new IllegalArgumentException("Invalid QR code"));

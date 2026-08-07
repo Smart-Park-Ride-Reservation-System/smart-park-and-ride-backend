@@ -4,6 +4,7 @@ import com.project.smartparking.model.Reservation;
 import com.project.smartparking.service.ReservationService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -21,26 +22,31 @@ public class ReservationController {
     }
 
     @GetMapping("/{id}")
+    @PreAuthorize("@securityAccess.canAccessReservation(authentication, #id)")
     public ResponseEntity<?> getById(@PathVariable Long id) {
         return ResponseEntity.ok(reservationService.getById(id));
     }
 
     @GetMapping("/user/{userId}")
+    @PreAuthorize("@securityAccess.isOwner(authentication, #userId)")
     public List<Reservation> getByUser(@PathVariable Long userId) {
         return reservationService.getByUser(userId);
     }
 
     @PostMapping
+    @PreAuthorize("@securityAccess.isOwner(authentication, #r.userId)")
     public ResponseEntity<?> create(@RequestBody Reservation r) {
         return ResponseEntity.ok(reservationService.create(r));
     }
 
     @PutMapping("/{id}")
+    @PreAuthorize("@securityAccess.canAccessReservation(authentication, #id)")
     public ResponseEntity<?> update(@PathVariable Long id, @RequestBody Reservation updated) {
         return ResponseEntity.ok(reservationService.update(id, updated));
     }
 
     @PutMapping("/{id}/cancel")
+    @PreAuthorize("@securityAccess.canAccessReservation(authentication, #id)")
     public ResponseEntity<?> cancel(@PathVariable Long id) {
         reservationService.cancel(id);
         return ResponseEntity.ok("Cancelled successfully");

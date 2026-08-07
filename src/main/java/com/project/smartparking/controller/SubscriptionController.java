@@ -8,6 +8,7 @@ import com.project.smartparking.service.RecommendationService;
 import com.project.smartparking.service.SubscriptionService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -28,11 +29,13 @@ public class SubscriptionController {
     }
 
     @GetMapping("/user/{userId}")
+    @PreAuthorize("@securityAccess.isOwner(authentication, #userId)")
     public ResponseEntity<List<UserSubscription>> getUserSubscriptions(@PathVariable Long userId) {
         return ResponseEntity.ok(subscriptionService.getUserSubscriptions(userId));
     }
 
     @GetMapping("/user/{userId}/active")
+    @PreAuthorize("@securityAccess.isOwner(authentication, #userId)")
     public ResponseEntity<UserSubscription> getActiveSubscription(@PathVariable Long userId) {
         UserSubscription active = subscriptionService.getActiveSubscription(userId);
         if (active != null) {
@@ -42,6 +45,7 @@ public class SubscriptionController {
     }
 
     @PostMapping("/purchase")
+    @PreAuthorize("@securityAccess.isOwner(authentication, #request.userId)")
     public ResponseEntity<UserSubscription> purchasePackage(@RequestBody SubscriptionPurchaseRequest request) {
         try {
             UserSubscription sub = subscriptionService.purchasePackage(request);
@@ -52,6 +56,7 @@ public class SubscriptionController {
     }
 
     @GetMapping("/user/{userId}/recommendation")
+    @PreAuthorize("@securityAccess.isOwner(authentication, #userId)")
     public ResponseEntity<RecommendationResponse> getRecommendation(@PathVariable Long userId) {
         try {
             return ResponseEntity.ok(recommendationService.getRecommendation(userId));

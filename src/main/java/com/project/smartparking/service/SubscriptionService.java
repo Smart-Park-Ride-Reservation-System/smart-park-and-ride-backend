@@ -27,6 +27,10 @@ public class SubscriptionService {
     @Autowired
     private UserRepository userRepository;
 
+    // ------------------------------------------------------------
+    // USER-FACING METHODS
+    // ------------------------------------------------------------
+
     public List<SubscriptionPackage> getActivePackages() {
         return packageRepository.findByActiveTrue();
     }
@@ -36,7 +40,9 @@ public class SubscriptionService {
     }
 
     public UserSubscription getActiveSubscription(Long userId) {
-        Optional<UserSubscription> activeSub = userSubscriptionRepository.findFirstByUser_UserIdAndStatusOrderByEndDateDesc(userId, "ACTIVE");
+        Optional<UserSubscription> activeSub = userSubscriptionRepository
+                .findFirstByUser_UserIdAndStatusOrderByEndDateDesc(userId, "ACTIVE");
+
         if (activeSub.isPresent()) {
             UserSubscription sub = activeSub.get();
             if (sub.getEndDate().before(new Timestamp(System.currentTimeMillis()))) {
@@ -56,7 +62,6 @@ public class SubscriptionService {
         SubscriptionPackage subPackage = packageRepository.findById(request.getPackageId())
                 .orElseThrow(() -> new RuntimeException("Package not found"));
 
-       
         UserSubscription existing = getActiveSubscription(user.getUserId());
         if (existing != null) {
             existing.setStatus("EXPIRED");
@@ -75,5 +80,37 @@ public class SubscriptionService {
                 .build();
 
         return userSubscriptionRepository.save(newSubscription);
+    }
+
+    // ------------------------------------------------------------
+    // ADMIN-FACING METHODS
+    // ------------------------------------------------------------
+
+    public List<SubscriptionPackage> getAllPackages() {
+        return packageRepository.findAll(); // admin sees active + inactive
+    }
+
+    public SubscriptionPackage createPackage(SubscriptionPackage pkg) {
+        return packageRepository.save(pkg);
+    }
+
+    public SubscriptionPackage updatePackage(Long id, SubscriptionPackage updated) {
+        SubscriptionPackage existing = packageRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Package not found"));
+
+        existing.setName(updated.getName());
+        existing.setDurationDays(updated.getDurationDays());
+        existing.setPrice(updated.getPrice());
+        existing.setDescription(updated.getDescription());
+        existing.setActive(updated.isActive());
+
+        return packageRepository.save(existing);
+    }
+
+    public void deletePackage(Long id) {
+        if (!packageRepository.existsById(id)) {
+            throw new RuntimeException("Package not found");
+        }
+        packageRepository.deleteById(id);
     }
 }

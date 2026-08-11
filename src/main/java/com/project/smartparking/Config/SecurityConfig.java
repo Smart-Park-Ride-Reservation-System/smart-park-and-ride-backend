@@ -11,6 +11,7 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.security.web.header.writers.ReferrerPolicyHeaderWriter;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.beans.factory.annotation.Value;
@@ -19,8 +20,7 @@ import java.util.List;
 
 @Configuration
 @EnableWebSecurity
-@EnableMethodSecurity // required for @PreAuthorize on controller/service methods (see
-                      // ReservationController)
+@EnableMethodSecurity
 public class SecurityConfig {
 
     @Bean
@@ -47,6 +47,20 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http, JwtAuthFilter jwtAuthFilter) throws Exception {
         http
+                .headers(headers -> headers
+                        .httpStrictTransportSecurity(hsts -> hsts
+                                .includeSubDomains(true)
+                                .preload(true)
+                                .maxAgeInSeconds(31536000))
+                        .contentSecurityPolicy(csp -> csp
+                                .policyDirectives("default-src 'none'; frame-ancestors 'none'; base-uri 'none'"))
+                        .referrerPolicy(referrer -> referrer
+                                .policy(ReferrerPolicyHeaderWriter.ReferrerPolicy.STRICT_ORIGIN_WHEN_CROSS_ORIGIN))
+                        .frameOptions(frame -> frame.deny())
+                        .contentTypeOptions(contentType -> {
+                        })
+                        .permissionsPolicy(permissions -> permissions
+                                .policy("camera=(), microphone=(), geolocation=()")))
                 .csrf(csrf -> csrf.disable())
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
@@ -64,14 +78,6 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.DELETE, "/api/slots/**").hasRole("ADMIN")
 
                         // ---- Reservations ----
-                        // IMPORTANT: requestMatchers are evaluated in order, first match wins.
-                        // Specific sub-paths (gate scans, checkin/checkout, payment) MUST come
-                        // before the generic /{id} and /{id}/** rules below, or the specific
-                        // rules will never be reached.
-
-                        // Gate hardware / attendant-only actions — a commuter hitting these
-                        // directly would let them check themselves in/out without being
-                        // physically at the gate, or mark their own reservation as paid.
                         .requestMatchers(HttpMethod.PUT, "/api/reservations/gate-a/scan")
                         .hasAnyRole("ATTENDANT", "ADMIN")
                         .requestMatchers(HttpMethod.PUT, "/api/reservations/gate-b/scan")
@@ -84,16 +90,9 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.PUT, "/api/reservations/*/confirm-payment")
                         .hasAnyRole("ATTENDANT", "ADMIN")
 
-                        // Full unfiltered listing — staff only. Commuters use /user/{userId}
-                        // (with ownership enforced at the method level, see ReservationController).
                         .requestMatchers(HttpMethod.GET, "/api/reservations").hasAnyRole("ATTENDANT", "ADMIN")
-
-                        // Hard delete — reserve for staff/admin cleanup. Commuters cancel instead
-                        // (PUT /{id}/cancel below), which preserves the record for audit/history.
                         .requestMatchers(HttpMethod.DELETE, "/api/reservations/**").hasAnyRole("ADMIN")
 
-                        // Commuter-reachable actions — role check here, ownership check via
-                        // @PreAuthorize / service-layer check on the method itself.
                         .requestMatchers(HttpMethod.GET, "/api/reservations/user/**")
                         .hasAnyRole("COMMUTER", "ATTENDANT", "ADMIN")
                         .requestMatchers(HttpMethod.GET, "/api/reservations/**")

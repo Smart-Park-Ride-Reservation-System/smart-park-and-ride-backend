@@ -8,13 +8,6 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
-/**
- * Per-user notification bell endpoints. Deliberately NOT mapped to
- * /api/notifications - that base path belongs to
- * NotificationBroadcastController (the admin panel). Two controllers
- * claiming the same base path throws an ambiguous mapping error at
- * startup, so this one lives under /api/user-notifications instead.
- */
 @RestController
 @RequestMapping("/api/user-notifications")
 public class NotificationController {

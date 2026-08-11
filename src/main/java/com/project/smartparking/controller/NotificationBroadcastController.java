@@ -12,12 +12,6 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
-/**
- * Admin dashboard endpoints. Base path /api/notifications matches
- * the frontend exactly. Per-user bell endpoints live separately at
- * /api/user-notifications (NotificationController) to avoid an
- * ambiguous mapping clash.
- */
 @RestController
 @RequestMapping("/api/notifications")
 public class NotificationBroadcastController {
@@ -38,7 +32,6 @@ public class NotificationBroadcastController {
             NotificationBroadcast result = broadcastService.send(req);
             return ResponseEntity.ok(result);
         } catch (Exception e) {
-            // Never let this fall through silently - log AND return the reason.
             log.error("POST /api/notifications/send failed", e);
             return ResponseEntity.internalServerError()
                     .body("Failed to send notification: " + e.getMessage());

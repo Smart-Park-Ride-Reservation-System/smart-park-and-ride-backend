@@ -9,7 +9,7 @@ import org.springframework.web.bind.annotation.*;
 @RestController
 @RequestMapping("/api/admin/settings")
 @RequiredArgsConstructor
-@CrossOrigin(origins = "*", maxAge = 3600) // Assuming standard CORS setup
+@CrossOrigin(origins = "*", maxAge = 3600) 
 public class GlobalSettingsController {
 
     private final GlobalSettingsService globalSettingsService;

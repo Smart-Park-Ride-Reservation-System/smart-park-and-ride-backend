@@ -19,9 +19,6 @@ public class AiInsightsController {
         this.groqInsightsService = groqInsightsService;
     }
 
-    // Secure this the same way your other admin-only endpoints are secured —
-    // e.g. add @PreAuthorize("hasRole('ADMIN')") if you're using Spring Security
-    // method security, or rely on your existing JWT filter chain for this path.
     @PostMapping
     public ResponseEntity<?> getInsights(@RequestBody AiInsightsRequest request) {
         try {
@@ -36,4 +33,4 @@ public class AiInsightsController {
         }
     }
 }
-
+

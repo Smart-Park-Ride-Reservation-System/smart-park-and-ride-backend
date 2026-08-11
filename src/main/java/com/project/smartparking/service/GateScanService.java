@@ -4,27 +4,14 @@ import com.google.firebase.database.DatabaseReference;
 import com.google.firebase.database.FirebaseDatabase;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
-import org.springframework.web.bind.annotation.*;
 
 import java.sql.Timestamp;
 import java.time.Instant;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
-/**
- * Handles QR-scan events from the gatekeeper's phone (web scanner UI).
- *
- * Two gates, same reservation record:
- *   - ENTRY gate scan  -> reservation: PENDING     -> CHECKED_IN
- *   - EXIT  gate scan  -> reservation: CHECKED_IN   -> COMPLETED
- *
- * On a valid transition, we pulse the matching servo via Firebase.
- * The IR sensor is completely separate — it only reports slot
- * occupancy for live status/telemetry, and never changes reservation
- * state.
- *
- * Firebase Realtime DB paths used:
- *   /gates/{gateId}/open   -> boolean, hardware watches this and pulses servo
- */
+
 @Service
 public class GateScanService {
 
@@ -58,6 +45,7 @@ public class GateScanService {
             Timestamp.from(Instant.now()), reservation.id());
 
         openGate(gateId);
+        setSlotReserved(reservation.slotId(), true);
 
         return ScanResult.success("Checked in — slot " + reservation.slotId(), reservation.id());
     }
@@ -73,6 +61,7 @@ public class GateScanService {
             Timestamp.from(Instant.now()), reservation.id());
 
         openGate(gateId);
+        setSlotReserved(reservation.slotId(), false);
 
         return ScanResult.success("Checked out — slot " + reservation.slotId(), reservation.id());
     }
@@ -89,11 +78,21 @@ public class GateScanService {
         return results.isEmpty() ? null : results.get(0);
     }
 
-    /** Pulses the gate open via Firebase; hardware resets it after the servo cycle. */
     private void openGate(String gateId) {
         DatabaseReference gateRef = FirebaseDatabase.getInstance()
             .getReference("gates/" + gateId + "/open");
         gateRef.setValueAsync(true);
+    }
+
+    private void setSlotReserved(String slotId, boolean reserved) {
+        DatabaseReference slotRef = FirebaseDatabase.getInstance()
+            .getReference("slots/" + slotId);
+
+        Map<String, Object> update = new HashMap<>();
+        update.put("reserved", reserved);
+        update.put("updatedAt", Instant.now().toString());
+
+        slotRef.updateChildrenAsync(update);
     }
 
     public enum GateType { ENTRY, EXIT }
@@ -101,10 +100,10 @@ public class GateScanService {
     public record Reservation(Long id, String slotId, String status) {}
 
     public record ScanResult(boolean ok, String message, Long reservationId) {
-        static ScanResult success(String message, Long reservationId) {
+        public static ScanResult success(String message, Long reservationId) {
             return new ScanResult(true, message, reservationId);
         }
-        static ScanResult rejected(String message) {
+        public static ScanResult rejected(String message) {
             return new ScanResult(false, message, null);
         }
     }

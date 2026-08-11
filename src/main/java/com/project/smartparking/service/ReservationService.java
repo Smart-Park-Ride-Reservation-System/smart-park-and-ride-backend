@@ -1,5 +1,7 @@
 package com.project.smartparking.service;
 
+import com.google.firebase.database.DatabaseReference;
+import com.google.firebase.database.FirebaseDatabase;
 import com.project.smartparking.model.ParkingSlot;
 import com.project.smartparking.model.Payment;
 import com.project.smartparking.model.Reservation;
@@ -11,8 +13,11 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.time.LocalDateTime;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 @Service
@@ -64,6 +69,7 @@ public class ReservationService {
         r.setReservationFee(200.0);
         slot.setStatus(ParkingSlot.SlotStatus.RESERVED);
         slotRepo.save(slot);
+        syncSlotToFirebase(slot, false);
 
         return reservationRepo.save(r);
     }
@@ -135,7 +141,10 @@ public class ReservationService {
         slotRepo.findById(r.getSlotId()).ifPresent(slot -> {
             slot.setStatus(ParkingSlot.SlotStatus.OCCUPIED);
             slotRepo.save(slot);
+            syncSlotToFirebase(slot, false);
         });
+
+        openGate("entry-gate");
 
         return reservationRepo.save(r);
     }
@@ -153,6 +162,7 @@ public class ReservationService {
         slotRepo.findById(r.getSlotId()).ifPresent(slot -> {
             slot.setStatus(ParkingSlot.SlotStatus.OCCUPIED);
             slotRepo.save(slot);
+            syncSlotToFirebase(slot, false);
         });
 
         return reservationRepo.save(r);
@@ -171,6 +181,7 @@ public class ReservationService {
         slotRepo.findById(r.getSlotId()).ifPresent(slot -> {
             slot.setStatus(ParkingSlot.SlotStatus.AVAILABLE);
             slotRepo.save(slot);
+            syncSlotToFirebase(slot, false);
         });
 
         return reservationRepo.save(r);
@@ -256,6 +267,7 @@ public class ReservationService {
             slotRepo.findById(reservation.getSlotId()).ifPresent(slot -> {
                 slot.setStatus(ParkingSlot.SlotStatus.AVAILABLE);
                 slotRepo.save(slot);
+                syncSlotToFirebase(slot, false);
             });
 
         }
@@ -278,6 +290,7 @@ public class ReservationService {
             slotRepo.findById(slotId).ifPresent(slot -> {
                 slot.setStatus(ParkingSlot.SlotStatus.AVAILABLE);
                 slotRepo.save(slot);
+                syncSlotToFirebase(slot, false);
             });
         }
     }
@@ -296,7 +309,10 @@ public class ReservationService {
         slotRepo.findById(r.getSlotId()).ifPresent(slot -> {
             slot.setStatus(ParkingSlot.SlotStatus.AVAILABLE);
             slotRepo.save(slot);
+            syncSlotToFirebase(slot, false);
         });
+
+        openGate("exit-gate");
 
         return reservationRepo.save(r);
     }
@@ -313,5 +329,34 @@ public class ReservationService {
                 throw new IllegalStateException("Reservation is no longer valid: " + r.getStatus());
             default -> throw new IllegalStateException("Unexpected status: " + r.getStatus());
         };
+    }
+
+    public ParkingSlot setSlotStatusManually(Long slotId, ParkingSlot.SlotStatus status) {
+        ParkingSlot slot = slotRepo.findById(slotId)
+                .orElseThrow(() -> new IllegalArgumentException("Invalid slotId"));
+
+        slot.setStatus(status);
+        slotRepo.save(slot);
+        syncSlotToFirebase(slot, true);
+
+        return slot;
+    }
+     
+    private void openGate(String gateId) {
+        DatabaseReference gateRef = FirebaseDatabase.getInstance()
+                .getReference("gates/" + gateId + "/open");
+        gateRef.setValueAsync(true);
+    }
+
+    private void syncSlotToFirebase(ParkingSlot slot, boolean manualOverride) {
+        DatabaseReference slotRef = FirebaseDatabase.getInstance()
+                .getReference("slots/" + slot.getSlotId());
+
+        Map<String, Object> update = new HashMap<>();
+        update.put("status", slot.getStatus().name()); // e.g. AVAILABLE / RESERVED / OCCUPIED
+        update.put("manualOverride", manualOverride);
+        update.put("updatedAt", Instant.now().toString());
+
+        slotRef.updateChildrenAsync(update);
     }
 }

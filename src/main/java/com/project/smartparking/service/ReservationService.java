@@ -118,8 +118,19 @@ public class ReservationService {
         Reservation r = getById(id);
 
         if (!"PENDING".equals(r.getStatus())) {
-            throw new IllegalStateException("Only PENDING can be confirmed");
+            throw new IllegalStateException("Only PENDING reservations can be confirmed");
         }
+
+        if (r.getReservationFee() == null) {
+            throw new IllegalStateException("Reservation fee is not set");
+        }
+
+        Payment payment = new Payment();
+        payment.setReservationId(r.getReservationId());
+        payment.setAmount(BigDecimal.valueOf(r.getReservationFee()));
+        payment.setPaymentMethod("CARD");
+        payment.setPaymentStatus("SUCCESS");
+        paymentRepo.save(payment);
 
         r.setStatus("CONFIRMED");
         r.setQrToken(UUID.randomUUID().toString());
@@ -341,7 +352,7 @@ public class ReservationService {
 
         return slot;
     }
-     
+
     private void openGate(String gateId) {
         DatabaseReference gateRef = FirebaseDatabase.getInstance()
                 .getReference("gates/" + gateId + "/open");

@@ -59,6 +59,7 @@ public class ReservationController {
     }
 
     @PutMapping("/{id}/confirm-payment")
+    @PreAuthorize("@securityAccess.canAccessReservation(authentication, #id)")
     public ResponseEntity<?> confirmPayment(@PathVariable Long id) {
         return ResponseEntity.ok(reservationService.confirmPayment(id));
     }

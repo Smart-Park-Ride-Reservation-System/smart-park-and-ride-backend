@@ -37,7 +37,8 @@ public class PayHereService {
         Reservation r = reservationRepo.findById(reservationId)
                 .orElseThrow(() -> new IllegalArgumentException("Reservation not found: " + reservationId));
 
-        String amount = String.format("%.2f", r.getReservationFee() != null ? r.getReservationFee() : 200.0);
+        String amount = String.format(java.util.Locale.US, "%.2f",
+                r.getReservationFee() != null ? r.getReservationFee() : 200.0);
         String currency = "LKR";
         String orderId = String.valueOf(reservationId);
 
@@ -90,7 +91,7 @@ public class PayHereService {
                 .orElseThrow(() -> new RuntimeException("Reservation not found"));
 
         if ("2".equals(statusCode)) {
-           
+
             if ("PENDING".equals(r.getStatus())) {
                 r.setReservationFee(Double.parseDouble(amount));
                 r.setStatus("CONFIRMED");
@@ -98,12 +99,14 @@ public class PayHereService {
                 reservationRepo.save(r);
             }
         } else if ("-3".equals(statusCode)) {
-            // Refund case — reservation fee was refunded, no payment table entry needed either.
+            // Refund case — reservation fee was refunded, no payment table entry needed
+            // either.
             r.setStatus("CANCELLED");
             reservationRepo.save(r);
         }
         // FAILED / other codes: no reservation or payment table change needed.
-        // The reservation stays PENDING and will expire via the scheduled job if unpaid.
+        // The reservation stays PENDING and will expire via the scheduled job if
+        // unpaid.
     }
 
     private String md5(String input) {

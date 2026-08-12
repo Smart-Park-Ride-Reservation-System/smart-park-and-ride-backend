@@ -17,6 +17,7 @@ public class ReservationController {
     private ReservationService reservationService;
 
     @GetMapping
+    @PreAuthorize("hasAnyRole('ATTENDANT', 'ADMIN')")
     public List<Reservation> getAll() {
         return reservationService.getAll();
     }
@@ -53,43 +54,52 @@ public class ReservationController {
     }
 
     @DeleteMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<?> delete(@PathVariable Long id) {
         reservationService.delete(id);
         return ResponseEntity.ok("Deleted successfully");
     }
 
+    // Commuter pays online before arriving at the hub.
     @PutMapping("/{id}/confirm-payment")
     @PreAuthorize("@securityAccess.canAccessReservation(authentication, #id)")
     public ResponseEntity<?> confirmPayment(@PathVariable Long id) {
         return ResponseEntity.ok(reservationService.confirmPayment(id));
     }
 
+    // Staff marks a reservation paid at the gate (e.g. cash).
+    @PutMapping("/{id}/paid")
+    @PreAuthorize("hasAnyRole('ATTENDANT', 'ADMIN')")
+    public ResponseEntity<?> markPaid(@PathVariable Long id) {
+        return ResponseEntity.ok(reservationService.markPaid(id));
+    }
+
     @PutMapping("/checkin")
+    @PreAuthorize("hasAnyRole('ATTENDANT', 'ADMIN')")
     public ResponseEntity<?> checkInByCode(@RequestParam String code) {
         return ResponseEntity.ok(reservationService.checkInByQrToken(code));
     }
 
     @PutMapping("/{id}/checkin")
+    @PreAuthorize("hasAnyRole('ATTENDANT', 'ADMIN')")
     public ResponseEntity<?> checkInById(@PathVariable Long id) {
         return ResponseEntity.ok(reservationService.checkInById(id));
     }
 
     @PutMapping("/{id}/checkout")
+    @PreAuthorize("hasAnyRole('ATTENDANT', 'ADMIN')")
     public ResponseEntity<?> checkOut(@PathVariable Long id) {
         return ResponseEntity.ok(reservationService.checkOut(id));
     }
 
-    @PutMapping("/{id}/paid")
-    public ResponseEntity<?> markPaid(@PathVariable Long id) {
-        return ResponseEntity.ok(reservationService.markPaid(id));
-    }
-
-    @PutMapping("/gate-a/scan") // ENTRY — always check-in
+    @PutMapping("/gate-a/scan")
+    @PreAuthorize("hasAnyRole('ATTENDANT', 'ADMIN')")
     public ResponseEntity<?> gateAScan(@RequestParam String qrToken) {
         return ResponseEntity.ok(reservationService.checkInByQrToken(qrToken));
     }
 
-    @PutMapping("/gate-b/scan") // EXIT — always check-out
+    @PutMapping("/gate-b/scan")
+    @PreAuthorize("hasAnyRole('ATTENDANT', 'ADMIN')")
     public ResponseEntity<?> gateBScan(@RequestParam String qrToken) {
         return ResponseEntity.ok(reservationService.checkOutByQrToken(qrToken));
     }

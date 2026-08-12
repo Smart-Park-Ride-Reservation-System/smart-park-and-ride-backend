@@ -88,7 +88,9 @@ public class SecurityConfig {
                         .hasAnyRole("ATTENDANT", "ADMIN")
                         .requestMatchers(HttpMethod.PUT, "/api/reservations/*/paid").hasAnyRole("ATTENDANT", "ADMIN")
                         .requestMatchers(HttpMethod.PUT, "/api/reservations/*/confirm-payment")
-                        .hasAnyRole("ATTENDANT", "ADMIN")
+                        .hasAnyRole("COMMUTER", "ATTENDANT", "ADMIN")
+                        .requestMatchers(HttpMethod.PUT, "/api/reservations/*/confirm-payment")
+                        .hasAnyRole("COMMUTER", "ATTENDANT", "ADMIN")
 
                         .requestMatchers(HttpMethod.GET, "/api/reservations").hasAnyRole("ATTENDANT", "ADMIN")
                         .requestMatchers(HttpMethod.DELETE, "/api/reservations/**").hasAnyRole("ADMIN")

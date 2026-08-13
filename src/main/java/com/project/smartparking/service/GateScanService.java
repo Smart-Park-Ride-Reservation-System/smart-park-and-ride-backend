@@ -41,7 +41,7 @@ public class GateScanService {
         }
 
         jdbcTemplate.update(
-            "UPDATE reservations SET status = 'CHECKED_IN', checkin_time = ? WHERE id = ?",
+            "UPDATE reservations SET status = 'CHECKED_IN', actual_in = ? WHERE reservation_id = ?",
             Timestamp.from(Instant.now()), reservation.id());
 
         openGate(gateId);
@@ -57,7 +57,7 @@ public class GateScanService {
         }
 
         jdbcTemplate.update(
-            "UPDATE reservations SET status = 'COMPLETED', checkout_time = ? WHERE id = ?",
+            "UPDATE reservations SET status = 'COMPLETED', actual_out = ? WHERE reservation_id = ?",
             Timestamp.from(Instant.now()), reservation.id());
 
         openGate(gateId);
@@ -67,11 +67,11 @@ public class GateScanService {
     }
 
     private Reservation findReservationByToken(String qrToken) {
-        String sql = "SELECT id, slot_id, status FROM reservations WHERE qr_token = ?";
+        String sql = "SELECT reservation_id, slot_id, status FROM reservations WHERE qr_token = ?";
         List<Reservation> results = jdbcTemplate.query(sql,
             (rs, rowNum) -> new Reservation(
-                rs.getLong("id"),
-                rs.getString("slot_id"),
+                rs.getLong("reservation_id"),
+                rs.getLong("slot_id"),
                 rs.getString("status")),
             qrToken);
 
@@ -84,7 +84,7 @@ public class GateScanService {
         gateRef.setValueAsync(true);
     }
 
-    private void setSlotReserved(String slotId, boolean reserved) {
+    private void setSlotReserved(Long slotId, boolean reserved) {
         DatabaseReference slotRef = FirebaseDatabase.getInstance()
             .getReference("slots/" + slotId);
 
@@ -97,7 +97,7 @@ public class GateScanService {
 
     public enum GateType { ENTRY, EXIT }
 
-    public record Reservation(Long id, String slotId, String status) {}
+    public record Reservation(Long id, Long slotId, String status) {}
 
     public record ScanResult(boolean ok, String message, Long reservationId) {
         public static ScanResult success(String message, Long reservationId) {

@@ -59,8 +59,9 @@ public class SecurityConfig {
                         .frameOptions(frame -> frame.deny())
                         .contentTypeOptions(contentType -> {
                         })
+                        
                         .permissionsPolicy(permissions -> permissions
-                                .policy("camera=(), microphone=(), geolocation=()")))
+                                .policy("camera=(self), microphone=(), geolocation=()")))
                 .csrf(csrf -> csrf.disable())
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
@@ -70,67 +71,68 @@ public class SecurityConfig {
                         .requestMatchers("/api/auth/**").permitAll()
 
                         // ---- Slots ----
+                        
                         .requestMatchers(HttpMethod.POST, "/api/slots/generate").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.GET, "/api/slots/search").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/slots/**").permitAll()
-                        .requestMatchers(HttpMethod.POST, "/api/slots/**").hasAnyRole("ADMIN", "ATTENDANT")
-                        .requestMatchers(HttpMethod.PUT, "/api/slots/**").hasAnyRole("ADMIN", "ATTENDANT")
-                        .requestMatchers(HttpMethod.DELETE, "/api/slots/**").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.POST, "/api/slots/**").hasAnyRole("ADMIN", "HUB_ADMIN", "ATTENDANT")
+                        .requestMatchers(HttpMethod.PUT, "/api/slots/**").hasAnyRole("ADMIN", "HUB_ADMIN", "ATTENDANT")
+                        .requestMatchers(HttpMethod.DELETE, "/api/slots/**").hasAnyRole("ADMIN", "HUB_ADMIN")
 
                         // ---- Reservations ----
+                        
                         .requestMatchers(HttpMethod.PUT, "/api/reservations/gate-a/scan")
-                        .hasAnyRole("ATTENDANT", "ADMIN")
+                        .hasAnyRole("ATTENDANT", "HUB_ADMIN", "ADMIN")
                         .requestMatchers(HttpMethod.PUT, "/api/reservations/gate-b/scan")
-                        .hasAnyRole("ATTENDANT", "ADMIN")
-                        .requestMatchers(HttpMethod.PUT, "/api/reservations/checkin").hasAnyRole("ATTENDANT", "ADMIN")
-                        .requestMatchers(HttpMethod.PUT, "/api/reservations/*/checkin").hasAnyRole("ATTENDANT", "ADMIN")
+                        .hasAnyRole("ATTENDANT", "HUB_ADMIN", "ADMIN")
+                        .requestMatchers(HttpMethod.PUT, "/api/reservations/checkin").hasAnyRole("ATTENDANT", "HUB_ADMIN", "ADMIN")
+                        .requestMatchers(HttpMethod.PUT, "/api/reservations/*/checkin").hasAnyRole("ATTENDANT", "HUB_ADMIN", "ADMIN")
                         .requestMatchers(HttpMethod.PUT, "/api/reservations/*/checkout")
-                        .hasAnyRole("ATTENDANT", "ADMIN")
-                        .requestMatchers(HttpMethod.PUT, "/api/reservations/*/paid").hasAnyRole("ATTENDANT", "ADMIN")
+                        .hasAnyRole("ATTENDANT", "HUB_ADMIN", "ADMIN")
+                        .requestMatchers(HttpMethod.PUT, "/api/reservations/*/paid").hasAnyRole("ATTENDANT", "HUB_ADMIN", "ADMIN")
                         .requestMatchers(HttpMethod.PUT, "/api/reservations/*/confirm-payment")
-                        .hasAnyRole("COMMUTER", "ATTENDANT", "ADMIN")
-                        .requestMatchers(HttpMethod.PUT, "/api/reservations/*/confirm-payment")
-                        .hasAnyRole("COMMUTER", "ATTENDANT", "ADMIN")
+                        .hasAnyRole("COMMUTER", "ATTENDANT", "HUB_ADMIN", "ADMIN")
 
-                        .requestMatchers(HttpMethod.GET, "/api/reservations").hasAnyRole("ATTENDANT", "ADMIN")
+                        .requestMatchers(HttpMethod.GET, "/api/reservations").hasAnyRole("ATTENDANT", "HUB_ADMIN", "ADMIN")
                         .requestMatchers(HttpMethod.DELETE, "/api/reservations/**").hasAnyRole("ADMIN")
 
                         .requestMatchers(HttpMethod.GET, "/api/reservations/user/**")
-                        .hasAnyRole("COMMUTER", "ATTENDANT", "ADMIN")
+                        .hasAnyRole("COMMUTER", "ATTENDANT", "HUB_ADMIN", "ADMIN")
                         .requestMatchers(HttpMethod.GET, "/api/reservations/**")
-                        .hasAnyRole("COMMUTER", "ATTENDANT", "ADMIN")
+                        .hasAnyRole("COMMUTER", "ATTENDANT", "HUB_ADMIN", "ADMIN")
                         .requestMatchers(HttpMethod.POST, "/api/reservations")
-                        .hasAnyRole("COMMUTER", "ATTENDANT", "ADMIN")
+                        .hasAnyRole("COMMUTER", "ATTENDANT", "HUB_ADMIN", "ADMIN")
                         .requestMatchers(HttpMethod.PUT, "/api/reservations/*/cancel")
-                        .hasAnyRole("COMMUTER", "ATTENDANT", "ADMIN")
+                        .hasAnyRole("COMMUTER", "ATTENDANT", "HUB_ADMIN", "ADMIN")
                         .requestMatchers(HttpMethod.PUT, "/api/reservations/**")
-                        .hasAnyRole("COMMUTER", "ATTENDANT", "ADMIN")
+                        .hasAnyRole("COMMUTER", "ATTENDANT", "HUB_ADMIN", "ADMIN")
 
                         // ---- Payments ----
                         .requestMatchers(HttpMethod.GET, "/api/payments/payhere/init").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/payments/payhere/notify").permitAll()
-                        .requestMatchers("/api/payments", "/api/payments/**").hasAnyRole("ADMIN", "ATTENDANT")
+                        .requestMatchers("/api/payments", "/api/payments/**").hasAnyRole("ADMIN", "HUB_ADMIN", "ATTENDANT")
 
                         // ---- Lots ----
                         .requestMatchers(HttpMethod.GET, "/api/lots", "/api/lots/**").permitAll()
-                        .requestMatchers(HttpMethod.POST, "/api/lots", "/api/lots/**").hasRole("ADMIN")
-                        .requestMatchers(HttpMethod.PUT, "/api/lots", "/api/lots/**").hasRole("ADMIN")
-                        .requestMatchers(HttpMethod.DELETE, "/api/lots", "/api/lots/**").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.POST, "/api/lots", "/api/lots/**").hasAnyRole("ADMIN", "HUB_ADMIN")
+                        .requestMatchers(HttpMethod.PUT, "/api/lots", "/api/lots/**").hasAnyRole("ADMIN", "HUB_ADMIN")
+                        .requestMatchers(HttpMethod.DELETE, "/api/lots", "/api/lots/**").hasAnyRole("ADMIN", "HUB_ADMIN")
 
                         // ---- Users ----
                         .requestMatchers("/api/users/**").hasRole("ADMIN")
 
                         // ---- Hubs ----
-                        .requestMatchers(HttpMethod.GET, "/api/hubs/**").hasAnyRole("COMMUTER", "ATTENDANT", "ADMIN")
-                        .requestMatchers(HttpMethod.POST, "/api/hubs/**").hasAnyRole("ADMIN", "ATTENDANT")
-                        .requestMatchers(HttpMethod.PUT, "/api/hubs/**").hasAnyRole("ADMIN", "ATTENDANT")
+                       
+                        .requestMatchers(HttpMethod.GET, "/api/hubs/**").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/hubs/**").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.PUT, "/api/hubs/**").hasAnyRole("ADMIN", "HUB_ADMIN")
                         .requestMatchers(HttpMethod.DELETE, "/api/hubs/**").hasRole("ADMIN")
 
                         .requestMatchers("/api/ai-insights").hasRole("ADMIN")
 
-                        // ---- Subscriptions ----
-                        .requestMatchers(HttpMethod.GET, "/api/subscriptions/**")
-                        .hasAnyRole("COMMUTER", "ATTENDANT", "ADMIN")
+                        // ---- Subscriptions (packages) ----
+                        
+                        .requestMatchers(HttpMethod.GET, "/api/subscriptions/**").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/subscriptions/**").hasAnyRole("COMMUTER", "ADMIN")
                         .requestMatchers(HttpMethod.PUT, "/api/subscriptions/**").hasAnyRole("COMMUTER", "ADMIN")
                         .requestMatchers(HttpMethod.DELETE, "/api/subscriptions/**").hasAnyRole("COMMUTER", "ADMIN")

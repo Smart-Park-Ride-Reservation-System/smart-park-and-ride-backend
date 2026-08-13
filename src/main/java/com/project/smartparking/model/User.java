@@ -50,6 +50,7 @@ public class User {
 
     public enum Role {
         ADMIN,
+        HUB_ADMIN,
         ATTENDANT,
         COMMUTER,;
 

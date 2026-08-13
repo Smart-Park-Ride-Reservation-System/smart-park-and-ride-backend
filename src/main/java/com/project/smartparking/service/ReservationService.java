@@ -11,6 +11,7 @@ import com.project.smartparking.repository.ReservationRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -114,8 +115,13 @@ public class ReservationService {
         reservationRepo.deleteById(id);
     }
 
-    public Reservation confirmPayment(Long id) {
+    @Transactional
+    public synchronized Reservation confirmPayment(Long id) {
         Reservation r = getById(id);
+
+        if (List.of("CONFIRMED", "CHECKED_IN", "COMPLETED", "PAID").contains(r.getStatus())) {
+            return r;
+        }
 
         if (!"PENDING".equals(r.getStatus())) {
             throw new IllegalStateException("Only PENDING reservations can be confirmed");
@@ -125,15 +131,23 @@ public class ReservationService {
             throw new IllegalStateException("Reservation fee is not set");
         }
 
-        Payment payment = new Payment();
-        payment.setReservationId(r.getReservationId());
-        payment.setAmount(BigDecimal.valueOf(r.getReservationFee()));
-        payment.setPaymentMethod("CARD");
-        payment.setPaymentStatus("SUCCESS");
-        paymentRepo.save(payment);
+        boolean reservationFeeAlreadyPaid = paymentRepo.findByReservationId(r.getReservationId())
+                .stream()
+                .anyMatch(p -> "CARD".equals(p.getPaymentMethod()) && "SUCCESS".equals(p.getPaymentStatus()));
+
+        if (!reservationFeeAlreadyPaid) {
+            Payment payment = new Payment();
+            payment.setReservationId(r.getReservationId());
+            payment.setAmount(BigDecimal.valueOf(r.getReservationFee()));
+            payment.setPaymentMethod("CARD");
+            payment.setPaymentStatus("SUCCESS");
+            paymentRepo.save(payment);
+        }
 
         r.setStatus("CONFIRMED");
-        r.setQrToken(UUID.randomUUID().toString());
+        if (r.getQrToken() == null) {
+            r.setQrToken(UUID.randomUUID().toString());
+        }
 
         return reservationRepo.save(r);
     }
@@ -163,8 +177,8 @@ public class ReservationService {
     public Reservation checkInById(Long id) {
         Reservation r = getById(id);
 
-        if (!List.of("CONFIRMED", "PENDING").contains(r.getStatus())) {
-            throw new IllegalStateException("Not in valid state for check-in");
+        if (!"CONFIRMED".equals(r.getStatus())) {
+            throw new IllegalStateException("Not in valid state for check-in: " + r.getStatus());
         }
 
         r.setActualIn(LocalDateTime.now());
@@ -198,22 +212,33 @@ public class ReservationService {
         return reservationRepo.save(r);
     }
 
-    public Reservation markPaid(Long id) {
+    @Transactional
+    public synchronized Reservation markPaid(Long id) {
         Reservation r = getById(id);
+
+        if ("PAID".equals(r.getStatus())) {
+            return r;
+        }
 
         if (!"COMPLETED".equals(r.getStatus())) {
             throw new IllegalStateException("Only COMPLETED reservations can be marked as paid");
         }
 
-        double calculatedAmount = calculateParkingCharge(r);
+        boolean durationChargeAlreadyPaid = paymentRepo.findByReservationId(r.getReservationId())
+                .stream()
+                .anyMatch(p -> "CASH".equals(p.getPaymentMethod()) && "SUCCESS".equals(p.getPaymentStatus()));
 
-        Payment payment = new Payment();
-        payment.setReservationId(r.getReservationId());
-        payment.setAmount(BigDecimal.valueOf(calculatedAmount));
-        payment.setPaymentMethod("CASH");
-        payment.setPaymentStatus("SUCCESS");
+        if (!durationChargeAlreadyPaid) {
+            double calculatedAmount = calculateParkingCharge(r);
 
-        paymentRepo.save(payment);
+            Payment payment = new Payment();
+            payment.setReservationId(r.getReservationId());
+            payment.setAmount(BigDecimal.valueOf(calculatedAmount));
+            payment.setPaymentMethod("CASH");
+            payment.setPaymentStatus("SUCCESS");
+
+            paymentRepo.save(payment);
+        }
 
         r.setStatus("PAID");
         return reservationRepo.save(r);
@@ -261,27 +286,6 @@ public class ReservationService {
         reservationRepo
                 .findByStatusAndScheduledInBeforeAndActualInIsNull("CONFIRMED", now.minusMinutes(15))
                 .forEach(this::expire);
-    }
-
-    @Scheduled(fixedRate = 60000)
-    public void autoCancelUnoccupiedReservations() {
-        LocalDateTime now = LocalDateTime.now();
-
-        List<Reservation> overdueReservations = reservationRepo.findByStatusAndScheduledInBeforeAndActualInIsNull(
-                "CONFIRMED",
-                now.minusMinutes(15));
-
-        for (Reservation reservation : overdueReservations) {
-            reservation.setStatus("CANCELLED");
-            reservationRepo.save(reservation);
-
-            slotRepo.findById(reservation.getSlotId()).ifPresent(slot -> {
-                slot.setStatus(ParkingSlot.SlotStatus.AVAILABLE);
-                slotRepo.save(slot);
-                syncSlotToFirebase(slot, false);
-            });
-
-        }
     }
 
     private void expire(Reservation r) {

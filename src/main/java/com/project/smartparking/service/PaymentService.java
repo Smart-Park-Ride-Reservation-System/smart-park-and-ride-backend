@@ -4,6 +4,7 @@ import com.project.smartparking.model.Payment;
 import com.project.smartparking.repository.PaymentRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.util.List;
@@ -46,7 +47,6 @@ public class PaymentService {
         if (payment.getPaymentMethod() != null && !VALID_METHODS.contains(payment.getPaymentMethod()))
             throw new IllegalArgumentException("Invalid payment method: " + payment.getPaymentMethod());
 
-        // Let @PrePersist in Payment handle default status ("PENDING") if not set
         return paymentRepository.save(payment);
     }
 
@@ -59,17 +59,8 @@ public class PaymentService {
         return paymentRepository.save(payment);
     }
 
-    /**
-     * Records a completed parking-charge payment for a reservation.
-     * Called by ReservationService.markPaid() — this is the ONLY place
-     * that should ever insert a "parking charge paid" row into `payments`.
-     *
-     * amount here is the checkout charge only (hours * rate).
-     * The 200 Rs reservationFee is intentionally never passed through here —
-     * it lives solely on the reservation row and is summed separately
-     * on the frontend (totalFeeRevenue + totalPaymentRevenue).
-     */
-    public Payment recordPayment(Long reservationId, Double amount, String method) {
+    @Transactional
+    public synchronized Payment recordPayment(Long reservationId, Double amount, String method) {
         if (reservationId == null)
             throw new IllegalArgumentException("reservationId is required");
         if (amount == null || amount <= 0)
@@ -77,12 +68,24 @@ public class PaymentService {
         if (method != null && !VALID_METHODS.contains(method))
             throw new IllegalArgumentException("Invalid payment method: " + method);
 
+        String resolvedMethod = method != null ? method : "CASH";
+
+        List<Payment> existing = paymentRepository.findByReservationId(reservationId);
+        Payment duplicate = existing.stream()
+                .filter(p -> resolvedMethod.equals(p.getPaymentMethod())
+                        && "SUCCESS".equals(p.getPaymentStatus()))
+                .findFirst()
+                .orElse(null);
+
+        if (duplicate != null) {
+            return duplicate;
+        }
+
         Payment payment = new Payment();
         payment.setReservationId(reservationId);
         payment.setAmount(BigDecimal.valueOf(amount));
-        payment.setPaymentMethod(method != null ? method : "CASH");
+        payment.setPaymentMethod(resolvedMethod);
         payment.setPaymentStatus("SUCCESS");
-        // paymentDate is set automatically by Payment's @PrePersist
 
         return paymentRepository.save(payment);
     }

@@ -43,4 +43,16 @@ public class UserSubscription {
             this.status = "ACTIVE";
         }
     }
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "hub_id")
+    private Hub hub;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "lot_id")
+    private ParkingLot lot;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "slot_id")
+    private ParkingSlot slot;
 }

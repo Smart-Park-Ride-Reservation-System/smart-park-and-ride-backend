@@ -4,6 +4,7 @@ import com.project.smartparking.model.Payment;
 import com.project.smartparking.service.PaymentService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -38,5 +39,11 @@ public class PaymentController {
     @PutMapping("/{id}/status")
     public ResponseEntity<?> updateStatus(@PathVariable Long id, @RequestParam String status) {
         return ResponseEntity.ok(paymentService.updateStatus(id, status));
+    }
+
+    @GetMapping("/summary")
+    @PreAuthorize("hasAnyRole('ATTENDANT', 'ADMIN')")
+    public ResponseEntity<?> getRevenueSummary() {
+        return ResponseEntity.ok(paymentService.getRevenueSummary());
     }
 }

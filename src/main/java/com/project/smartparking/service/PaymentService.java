@@ -7,16 +7,16 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 @Service
 public class PaymentService {
 
-    private static final List<String> VALID_STATUSES =
-            List.of("PENDING", "SUCCESS", "FAILED", "REFUNDED");
+    private static final List<String> VALID_STATUSES = List.of("PENDING", "SUCCESS", "FAILED", "REFUNDED");
 
-    private static final List<String> VALID_METHODS =
-            List.of("CARD", "PAYHERE", "CASH", "BANK_TRANSFER");
+    private static final List<String> VALID_METHODS = List.of("CARD", "PAYHERE", "CASH", "BANK_TRANSFER");
 
     @Autowired
     private PaymentRepository paymentRepository;
@@ -88,5 +88,25 @@ public class PaymentService {
         payment.setPaymentStatus("SUCCESS");
 
         return paymentRepository.save(payment);
+    }
+
+    public Map<String, BigDecimal> getRevenueSummary() {
+        List<Payment> successful = paymentRepository.findByPaymentStatus("SUCCESS");
+
+        BigDecimal reservationFees = successful.stream()
+                .filter(p -> "CARD".equals(p.getPaymentMethod()))
+                .map(Payment::getAmount)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        BigDecimal durationCharges = successful.stream()
+                .filter(p -> "CASH".equals(p.getPaymentMethod()))
+                .map(Payment::getAmount)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        Map<String, BigDecimal> summary = new HashMap<>();
+        summary.put("reservationFees", reservationFees);
+        summary.put("durationCharges", durationCharges);
+        summary.put("total", reservationFees.add(durationCharges));
+        return summary;
     }
 }

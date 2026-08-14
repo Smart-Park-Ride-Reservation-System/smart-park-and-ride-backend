@@ -130,7 +130,6 @@ public class SecurityConfig {
 
                         .requestMatchers("/api/ai-insights").hasRole("ADMIN")
 
-                        // ---- Subscriptions (packages) ----
                         
                         .requestMatchers(HttpMethod.GET, "/api/subscriptions/**").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/subscriptions/**").hasAnyRole("COMMUTER", "ADMIN")

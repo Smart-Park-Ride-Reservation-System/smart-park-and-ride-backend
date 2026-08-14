@@ -9,7 +9,10 @@ import com.project.smartparking.repository.UserRepository;
 import com.project.smartparking.repository.UserSubscriptionRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import com.project.smartparking.dto.SubscriptionSummaryResponse;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.sql.Timestamp;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -26,10 +29,6 @@ public class SubscriptionService {
 
     @Autowired
     private UserRepository userRepository;
-
-    // ------------------------------------------------------------
-    // USER-FACING METHODS
-    // ------------------------------------------------------------
 
     public List<SubscriptionPackage> getActivePackages() {
         return packageRepository.findByActiveTrue();
@@ -82,12 +81,8 @@ public class SubscriptionService {
         return userSubscriptionRepository.save(newSubscription);
     }
 
-    // ------------------------------------------------------------
-    // ADMIN-FACING METHODS
-    // ------------------------------------------------------------
-
     public List<SubscriptionPackage> getAllPackages() {
-        return packageRepository.findAll(); // admin sees active + inactive
+        return packageRepository.findAll();
     }
 
     public SubscriptionPackage createPackage(SubscriptionPackage pkg) {
@@ -112,5 +107,29 @@ public class SubscriptionService {
             throw new RuntimeException("Package not found");
         }
         packageRepository.deleteById(id);
+    }
+
+    public SubscriptionSummaryResponse getSubscriptionSummary() {
+        Timestamp now = new Timestamp(System.currentTimeMillis());
+        List<UserSubscription> activeSubs = userSubscriptionRepository.findCurrentlyActive(now);
+
+        BigDecimal mrr = activeSubs.stream()
+                .map(sub -> {
+                    SubscriptionPackage pkg = sub.getSubscriptionPackage();
+                    if (pkg == null || pkg.getDurationDays() == null || pkg.getDurationDays() <= 0) {
+                        return BigDecimal.ZERO;
+                    }
+                    // Normalize each plan's price to a monthly-equivalent so a
+                    // daily pass and a monthly plan aren't just added at face value.
+                    return pkg.getPrice()
+                            .multiply(BigDecimal.valueOf(30))
+                            .divide(BigDecimal.valueOf(pkg.getDurationDays()), 2, RoundingMode.HALF_UP);
+                })
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        return SubscriptionSummaryResponse.builder()
+                .activeCount(activeSubs.size())
+                .mrr(mrr)
+                .build();
     }
 }

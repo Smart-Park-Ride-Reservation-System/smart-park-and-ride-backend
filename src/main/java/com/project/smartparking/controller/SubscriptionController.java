@@ -10,6 +10,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
+import com.project.smartparking.dto.SubscriptionSummaryResponse;
 
 import java.util.List;
 
@@ -55,6 +56,12 @@ public class SubscriptionController {
         }
     }
 
+    @GetMapping("/summary")
+    @PreAuthorize("hasAnyRole('ADMIN', 'ATTENDANT')")
+    public ResponseEntity<SubscriptionSummaryResponse> getSubscriptionSummary() {
+        return ResponseEntity.ok(subscriptionService.getSubscriptionSummary());
+    }
+
     @GetMapping("/user/{userId}/recommendation")
     @PreAuthorize("@securityAccess.isOwner(authentication, #userId)")
     public ResponseEntity<RecommendationResponse> getRecommendation(@PathVariable Long userId) {
@@ -62,6 +69,41 @@ public class SubscriptionController {
             return ResponseEntity.ok(recommendationService.getRecommendation(userId));
         } catch (Exception e) {
             return ResponseEntity.status(503).build();
+        }
+    }
+
+    @GetMapping("/admin/packages")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<List<SubscriptionPackage>> getAllPackagesAdmin() {
+        return ResponseEntity.ok(subscriptionService.getAllPackages());
+    }
+
+    @PostMapping("/admin/packages")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<SubscriptionPackage> createPackage(@RequestBody SubscriptionPackage pkg) {
+        return ResponseEntity.ok(subscriptionService.createPackage(pkg));
+    }
+
+    @PutMapping("/admin/packages/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<SubscriptionPackage> updatePackage(
+            @PathVariable Long id,
+            @RequestBody SubscriptionPackage pkg) {
+        try {
+            return ResponseEntity.ok(subscriptionService.updatePackage(id, pkg));
+        } catch (RuntimeException e) {
+            return ResponseEntity.notFound().build();
+        }
+    }
+
+    @DeleteMapping("/admin/packages/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<Void> deletePackage(@PathVariable Long id) {
+        try {
+            subscriptionService.deletePackage(id);
+            return ResponseEntity.noContent().build();
+        } catch (RuntimeException e) {
+            return ResponseEntity.notFound().build();
         }
     }
 }

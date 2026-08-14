@@ -12,19 +12,6 @@ import org.springframework.stereotype.Service;
 
 import java.util.List;
 
-/**
- * Single entry point for all notification delivery in the app.
- *
- * Every feature - reservation confirmations, reminders, admin
- * broadcasts, future profile events - calls notify() here instead of
- * writing to the notifications table or calling EmailService directly.
- * This is what lets delivery rules change in one place instead of N.
- *
- * Current rules:
- *   - EMAIL  -> always saved as a DB record AND actually emailed.
- *   - SYSTEM -> saved as a DB record only (shows in the in-app bell).
- *   - SMS    -> reserved for future use, currently behaves like SYSTEM.
- */
 @Service
 public class NotificationService {
 

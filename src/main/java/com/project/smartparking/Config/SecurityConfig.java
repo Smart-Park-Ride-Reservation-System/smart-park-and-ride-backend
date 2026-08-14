@@ -135,6 +135,7 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.POST, "/api/subscriptions/**").hasAnyRole("COMMUTER", "ADMIN")
                         .requestMatchers(HttpMethod.PUT, "/api/subscriptions/**").hasAnyRole("COMMUTER", "ADMIN")
                         .requestMatchers(HttpMethod.DELETE, "/api/subscriptions/**").hasAnyRole("COMMUTER", "ADMIN")
+                        .requestMatchers(HttpMethod.PATCH, "/api/subscriptions/**").hasAnyRole("COMMUTER", "ADMIN")
 
                         .anyRequest().authenticated())
                 .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);

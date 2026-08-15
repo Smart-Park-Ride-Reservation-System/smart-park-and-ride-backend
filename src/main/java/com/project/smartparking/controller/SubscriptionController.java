@@ -106,4 +106,26 @@ public class SubscriptionController {
             return ResponseEntity.notFound().build();
         }
     }
+
+    @PatchMapping("/user/{userId}/location")
+    @PreAuthorize("@securityAccess.isOwner(authentication, #userId)")
+    public ResponseEntity<UserSubscription> updateLocation(
+            @PathVariable Long userId,
+            @RequestBody com.project.smartparking.dto.LocationUpdateRequest request) {
+        try {
+            UserSubscription updated = subscriptionService.updateLocation(userId, request);
+            if (updated != null) {
+                return ResponseEntity.ok(updated);
+            }
+            return ResponseEntity.badRequest().build();
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().build();
+        }
+    }
+
+    @GetMapping("/admin/all")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<List<UserSubscription>> getAllSubscriptionsAdmin() {
+        return ResponseEntity.ok(subscriptionService.getAllSubscriptions());
+    }
 }

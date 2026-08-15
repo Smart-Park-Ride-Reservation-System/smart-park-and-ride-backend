@@ -4,9 +4,16 @@ import com.project.smartparking.dto.SubscriptionPurchaseRequest;
 import com.project.smartparking.model.SubscriptionPackage;
 import com.project.smartparking.model.User;
 import com.project.smartparking.model.UserSubscription;
+import com.project.smartparking.model.Hub;
+import com.project.smartparking.model.ParkingLot;
+import com.project.smartparking.model.ParkingSlot;
 import com.project.smartparking.repository.SubscriptionPackageRepository;
 import com.project.smartparking.repository.UserRepository;
 import com.project.smartparking.repository.UserSubscriptionRepository;
+import com.project.smartparking.repository.HubRepository;
+import com.project.smartparking.repository.ParkingLotRepository;
+import com.project.smartparking.repository.ParkingSlotRepository;
+import com.project.smartparking.dto.LocationUpdateRequest;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import com.project.smartparking.dto.SubscriptionSummaryResponse;
@@ -29,6 +36,15 @@ public class SubscriptionService {
 
     @Autowired
     private UserRepository userRepository;
+
+    @Autowired
+    private HubRepository hubRepository;
+
+    @Autowired
+    private ParkingLotRepository parkingLotRepository;
+
+    @Autowired
+    private ParkingSlotRepository parkingSlotRepository;
 
     public List<SubscriptionPackage> getActivePackages() {
         return packageRepository.findByActiveTrue();
@@ -131,5 +147,41 @@ public class SubscriptionService {
                 .activeCount(activeSubs.size())
                 .mrr(mrr)
                 .build();
+    }
+
+    public List<UserSubscription> getAllSubscriptions() {
+        return userSubscriptionRepository.findAll();
+    }
+
+    public UserSubscription updateLocation(Long userId, LocationUpdateRequest request) {
+        UserSubscription activeSub = getActiveSubscription(userId);
+        if (activeSub == null) {
+            throw new RuntimeException("No active subscription found");
+        }
+        if (request.getHubId() != null) {
+            Hub hub = hubRepository.findById(request.getHubId())
+                    .orElseThrow(() -> new RuntimeException("Hub not found"));
+            activeSub.setHub(hub);
+        } else {
+            activeSub.setHub(null);
+        }
+
+        if (request.getLotId() != null) {
+            ParkingLot lot = parkingLotRepository.findById(request.getLotId())
+                    .orElseThrow(() -> new RuntimeException("Lot not found"));
+            activeSub.setLot(lot);
+        } else {
+            activeSub.setLot(null);
+        }
+
+        if (request.getSlotId() != null) {
+            ParkingSlot slot = parkingSlotRepository.findById(request.getSlotId())
+                    .orElseThrow(() -> new RuntimeException("Slot not found"));
+            activeSub.setSlot(slot);
+        } else {
+            activeSub.setSlot(null);
+        }
+
+        return userSubscriptionRepository.save(activeSub);
     }
 }

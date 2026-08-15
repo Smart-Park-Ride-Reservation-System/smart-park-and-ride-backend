@@ -68,4 +68,10 @@ public class User {
     @ManyToOne
     @JoinColumn(name = "hub_id")
     private Hub hub;
+
+    @Transient
+    private Boolean hasActiveSubscription;
+
+    @Transient
+    private String subscriptionLocation;
 }

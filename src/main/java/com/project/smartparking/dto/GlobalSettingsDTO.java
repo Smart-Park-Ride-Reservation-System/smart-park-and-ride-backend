@@ -18,7 +18,10 @@ public class GlobalSettingsDTO {
     private Boolean maintenanceMode;
 
     // Pricing Settings
-    private Double standardHourlyRate;
+    private Double bikeHourlyRate;
+    private Double carHourlyRate;
+    private Double suvHourlyRate;
+    private Double vanHourlyRate;
     private Double dailyMaximumCap;
     private Boolean enableSurgePricing;
     private Integer surgeActivationThreshold;

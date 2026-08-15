@@ -29,7 +29,10 @@ public class GlobalSettingsService {
         if (dto.getMaintenanceMode() != null) settings.setMaintenanceMode(dto.getMaintenanceMode());
 
         // Pricing Settings
-        if (dto.getStandardHourlyRate() != null) settings.setStandardHourlyRate(dto.getStandardHourlyRate());
+        if (dto.getBikeHourlyRate() != null) settings.setBikeHourlyRate(dto.getBikeHourlyRate());
+        if (dto.getCarHourlyRate() != null) settings.setCarHourlyRate(dto.getCarHourlyRate());
+        if (dto.getSuvHourlyRate() != null) settings.setSuvHourlyRate(dto.getSuvHourlyRate());
+        if (dto.getVanHourlyRate() != null) settings.setVanHourlyRate(dto.getVanHourlyRate());
         if (dto.getDailyMaximumCap() != null) settings.setDailyMaximumCap(dto.getDailyMaximumCap());
         if (dto.getEnableSurgePricing() != null) settings.setEnableSurgePricing(dto.getEnableSurgePricing());
         if (dto.getSurgeActivationThreshold() != null) settings.setSurgeActivationThreshold(dto.getSurgeActivationThreshold());
@@ -70,7 +73,10 @@ public class GlobalSettingsService {
                     .systemCurrency("LKR")
                     .is247Operation(true)
                     .maintenanceMode(false)
-                    .standardHourlyRate(150.0)
+                    .bikeHourlyRate(50.0)
+                    .carHourlyRate(100.0)
+                    .suvHourlyRate(130.0)
+                    .vanHourlyRate(150.0)
                     .dailyMaximumCap(1500.0)
                     .enableSurgePricing(true)
                     .surgeActivationThreshold(85)
@@ -101,7 +107,10 @@ public class GlobalSettingsService {
                 .systemCurrency(settings.getSystemCurrency())
                 .is247Operation(settings.getIs247Operation())
                 .maintenanceMode(settings.getMaintenanceMode())
-                .standardHourlyRate(settings.getStandardHourlyRate())
+                .bikeHourlyRate(settings.getBikeHourlyRate())
+                .carHourlyRate(settings.getCarHourlyRate())
+                .suvHourlyRate(settings.getSuvHourlyRate())
+                .vanHourlyRate(settings.getVanHourlyRate())
                 .dailyMaximumCap(settings.getDailyMaximumCap())
                 .enableSurgePricing(settings.getEnableSurgePricing())
                 .surgeActivationThreshold(settings.getSurgeActivationThreshold())

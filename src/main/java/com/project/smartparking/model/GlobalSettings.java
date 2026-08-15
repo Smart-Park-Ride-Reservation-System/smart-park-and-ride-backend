@@ -29,8 +29,17 @@ public class GlobalSettings {
     private Boolean maintenanceMode;
 
     // Pricing Settings
-    @Column(name = "standard_hourly_rate")
-    private Double standardHourlyRate;
+    @Column(name = "bike_hourly_rate")
+    private Double bikeHourlyRate;
+
+    @Column(name = "car_hourly_rate")
+    private Double carHourlyRate;
+
+    @Column(name = "suv_hourly_rate")
+    private Double suvHourlyRate;
+
+    @Column(name = "van_hourly_rate")
+    private Double vanHourlyRate;
 
     @Column(name = "daily_maximum_cap")
     private Double dailyMaximumCap;

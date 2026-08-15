@@ -8,6 +8,7 @@ import com.project.smartparking.model.Reservation;
 import com.project.smartparking.repository.ParkingSlotRepository;
 import com.project.smartparking.repository.PaymentRepository;
 import com.project.smartparking.repository.ReservationRepository;
+import com.project.smartparking.dto.GlobalSettingsDTO;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
@@ -32,6 +33,8 @@ public class ReservationService {
     private ParkingSlotRepository slotRepo;
     @Autowired
     private SubscriptionService subscriptionService;
+    @Autowired
+    private GlobalSettingsService globalSettingsService;
 
     public List<Reservation> getAll() {
         return reservationRepo.findAll();
@@ -250,28 +253,55 @@ public class ReservationService {
             return 0.0;
         }
 
-        long millis = java.time.Duration.between(r.getActualIn(), r.getActualOut()).toMillis();
-        double hours = millis / (1000.0 * 60.0 * 60.0);
+        long minutes = java.time.Duration.between(r.getActualIn(), r.getActualOut()).toMinutes();
+        
+        GlobalSettingsDTO settings = globalSettingsService.getSettings();
+        
+        if (settings.getEntryGracePeriodMinutes() != null && minutes <= settings.getEntryGracePeriodMinutes()) {
+            return 0.0;
+        }
+
+        double hours = minutes / 60.0;
 
         double rate;
         switch (r.getVehicleType().toUpperCase()) {
             case "BIKE":
-                rate = 50;
+                rate = settings.getBikeHourlyRate() != null ? settings.getBikeHourlyRate() : 50.0;
                 break;
             case "CAR":
-                rate = 100;
+                rate = settings.getCarHourlyRate() != null ? settings.getCarHourlyRate() : 100.0;
                 break;
             case "SUV":
-                rate = 130;
+                rate = settings.getSuvHourlyRate() != null ? settings.getSuvHourlyRate() : 130.0;
                 break;
             case "VAN":
-                rate = 150;
+                rate = settings.getVanHourlyRate() != null ? settings.getVanHourlyRate() : 150.0;
                 break;
             default:
-                rate = 100;
+                rate = settings.getCarHourlyRate() != null ? settings.getCarHourlyRate() : 100.0;
         }
 
         double amount = hours * rate;
+
+        // Apply daily maximum cap
+        if (settings.getDailyMaximumCap() != null && settings.getDailyMaximumCap() > 0) {
+            double days = Math.ceil(hours / 24.0);
+            if (days == 0) days = 1;
+            double cap = days * settings.getDailyMaximumCap();
+            if (amount > cap) {
+                amount = cap;
+            }
+        }
+        
+        // Apply overstay penalty
+        if (settings.getMaximumParkingDurationHours() != null && settings.getMaximumParkingDurationHours() > 0) {
+            if (hours > settings.getMaximumParkingDurationHours()) {
+                double overstayHours = hours - settings.getMaximumParkingDurationHours();
+                double penaltyRate = settings.getOverstayPenaltyRate() != null ? settings.getOverstayPenaltyRate() : rate * 2;
+                amount += overstayHours * penaltyRate;
+            }
+        }
+
         return Math.ceil(amount * 100) / 100.0;
     }
 

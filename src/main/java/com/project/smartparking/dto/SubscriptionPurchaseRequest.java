@@ -6,4 +6,7 @@ import lombok.Data;
 public class SubscriptionPurchaseRequest {
     private Long userId;
     private Long packageId;
+    private Long hubId;
+    private Long lotId;
+    private Long slotId;
 }

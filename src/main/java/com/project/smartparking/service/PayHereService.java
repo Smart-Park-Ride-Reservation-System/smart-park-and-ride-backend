@@ -33,6 +33,9 @@ public class PayHereService {
     @Autowired
     private ReservationRepository reservationRepo;
 
+    @Autowired
+    private com.project.smartparking.repository.PaymentRepository paymentRepo;
+
     public Map<String, String> buildCheckoutFields(Long reservationId) {
         Reservation r = reservationRepo.findById(reservationId)
                 .orElseThrow(() -> new IllegalArgumentException("Reservation not found: " + reservationId));
@@ -97,6 +100,13 @@ public class PayHereService {
                 r.setStatus("CONFIRMED");
                 r.setQrToken(UUID.randomUUID().toString());
                 reservationRepo.save(r);
+
+                com.project.smartparking.model.Payment payment = new com.project.smartparking.model.Payment();
+                payment.setReservationId(r.getReservationId());
+                payment.setAmount(java.math.BigDecimal.valueOf(Double.parseDouble(amount)));
+                payment.setPaymentMethod("PAYHERE");
+                payment.setPaymentStatus("SUCCESS");
+                paymentRepo.save(payment);
             }
         } else if ("-3".equals(statusCode)) {
             // Refund case — reservation fee was refunded, no payment table entry needed

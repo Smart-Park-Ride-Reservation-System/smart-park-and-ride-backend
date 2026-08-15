@@ -94,7 +94,7 @@ public class PaymentService {
         List<Payment> successful = paymentRepository.findByPaymentStatus("SUCCESS");
 
         BigDecimal reservationFees = successful.stream()
-                .filter(p -> "CARD".equals(p.getPaymentMethod()))
+                .filter(p -> "CARD".equals(p.getPaymentMethod()) || "PAYHERE".equals(p.getPaymentMethod()))
                 .map(Payment::getAmount)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 

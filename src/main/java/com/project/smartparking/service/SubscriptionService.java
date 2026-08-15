@@ -86,13 +86,24 @@ public class SubscriptionService {
         LocalDateTime now = LocalDateTime.now();
         LocalDateTime end = now.plusDays(subPackage.getDurationDays());
 
-        UserSubscription newSubscription = UserSubscription.builder()
+        UserSubscription.UserSubscriptionBuilder builder = UserSubscription.builder()
                 .user(user)
                 .subscriptionPackage(subPackage)
                 .startDate(Timestamp.valueOf(now))
                 .endDate(Timestamp.valueOf(end))
-                .status("ACTIVE")
-                .build();
+                .status("ACTIVE");
+
+        if (request.getHubId() != null) {
+            builder.hub(hubRepository.findById(request.getHubId()).orElse(null));
+        }
+        if (request.getLotId() != null) {
+            builder.lot(parkingLotRepository.findById(request.getLotId()).orElse(null));
+        }
+        if (request.getSlotId() != null) {
+            builder.slot(parkingSlotRepository.findById(request.getSlotId()).orElse(null));
+        }
+
+        UserSubscription newSubscription = builder.build();
 
         return userSubscriptionRepository.save(newSubscription);
     }

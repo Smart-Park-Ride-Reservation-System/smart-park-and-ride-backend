@@ -41,6 +41,12 @@ public class PaymentController {
         return ResponseEntity.ok(paymentService.updateStatus(id, status));
     }
 
+    @PutMapping("/{id}")
+    @PreAuthorize("hasAnyRole('ATTENDANT', 'ADMIN')")
+    public ResponseEntity<?> update(@PathVariable Long id, @RequestBody Payment payment) {
+        return ResponseEntity.ok(paymentService.update(id, payment));
+    }
+
     @GetMapping("/summary")
     @PreAuthorize("hasAnyRole('ATTENDANT', 'ADMIN')")
     public ResponseEntity<?> getRevenueSummary() {

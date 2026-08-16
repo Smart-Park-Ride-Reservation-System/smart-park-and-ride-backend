@@ -1,4 +1,5 @@
 package com.project.smartparking.service;
+
 import io.jsonwebtoken.*;
 import io.jsonwebtoken.security.Keys;
 import org.springframework.beans.factory.annotation.Value;
@@ -23,15 +24,19 @@ public class JwtService {
     }
 
     public String generateToken(User user) {
-        return Jwts.builder()
+        var builder = Jwts.builder()
                 .subject(user.getEmail())
                 .claim("role", user.getRole() != null ? user.getRole().name() : "USER")
                 .claim("userId", user.getUserId())
                 .claim("firstName", user.getFirstName())
                 .issuedAt(new Date())
-                .expiration(new Date(System.currentTimeMillis() + expiration))
-                .signWith(getKey())
-                .compact();
+                .expiration(new Date(System.currentTimeMillis() + expiration));
+
+        if (user.getHub() != null) {
+            builder.claim("hubId", user.getHub().getHubId());
+        }
+
+        return builder.signWith(getKey()).compact();
     }
 
     public String extractEmail(String token) {
@@ -40,6 +45,11 @@ public class JwtService {
 
     public String extractRole(String token) {
         return getClaims(token).get("role", String.class);
+
+    }
+
+    public Long extractHubId(String token) {
+        return getClaims(token).get("hubId", Long.class);
     }
 
     public Long extractUserId(String token) {

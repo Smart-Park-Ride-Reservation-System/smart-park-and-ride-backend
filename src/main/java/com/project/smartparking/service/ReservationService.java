@@ -12,6 +12,11 @@ import com.project.smartparking.dto.GlobalSettingsDTO;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
+import com.project.smartparking.Config.AuthenticatedUser;
+import com.project.smartparking.model.ParkingLot;
+import com.project.smartparking.repository.ParkingLotRepository;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
@@ -35,6 +40,8 @@ public class ReservationService {
     private SubscriptionService subscriptionService;
     @Autowired
     private GlobalSettingsService globalSettingsService;
+    @Autowired
+    private ParkingLotRepository lotRepo;
 
     public List<Reservation> getAll() {
         return reservationRepo.findAll();
@@ -47,6 +54,28 @@ public class ReservationService {
 
     public List<Reservation> getByUser(Long userId) {
         return reservationRepo.findByUserId(userId);
+    }
+
+    private void assertHubAccess(Long slotId) {
+        var authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (!(authentication.getPrincipal() instanceof AuthenticatedUser current)) {
+            return;
+        }
+        if ("ADMIN".equals(current.role())) {
+            return;
+        }
+        if (current.hubId() == null) {
+            throw new AccessDeniedException("Your account has no hub assigned");
+        }
+
+        ParkingSlot slot = slotRepo.findById(slotId)
+                .orElseThrow(() -> new IllegalArgumentException("Invalid slotId"));
+        ParkingLot lot = lotRepo.findById(slot.getLotId())
+                .orElseThrow(() -> new IllegalStateException("Slot references a missing lot"));
+
+        if (!current.hubId().equals(lot.getHub().getHubId())) {
+            throw new AccessDeniedException("You are not assigned to this hub");
+        }
     }
 
     public Reservation create(Reservation r) {
@@ -158,7 +187,7 @@ public class ReservationService {
     public Reservation checkInByQrToken(String qrToken) {
         Reservation r = reservationRepo.findByQrToken(qrToken)
                 .orElseThrow(() -> new IllegalArgumentException("Invalid QR code"));
-
+        assertHubAccess(r.getSlotId());
         if (!"CONFIRMED".equals(r.getStatus())) {
             throw new IllegalStateException("Not in valid state for check-in: " + r.getStatus());
         }
@@ -179,7 +208,7 @@ public class ReservationService {
 
     public Reservation checkInById(Long id) {
         Reservation r = getById(id);
-
+        assertHubAccess(r.getSlotId());
         if (!"CONFIRMED".equals(r.getStatus())) {
             throw new IllegalStateException("Not in valid state for check-in: " + r.getStatus());
         }
@@ -198,7 +227,7 @@ public class ReservationService {
 
     public Reservation checkOut(Long id) {
         Reservation r = getById(id);
-
+        assertHubAccess(r.getSlotId());
         if (!"CHECKED_IN".equals(r.getStatus())) {
             throw new IllegalStateException("Not checked in");
         }
@@ -218,7 +247,7 @@ public class ReservationService {
     @Transactional
     public synchronized Reservation markPaid(Long id) {
         Reservation r = getById(id);
-
+        assertHubAccess(r.getSlotId());
         if ("PAID".equals(r.getStatus())) {
             return r;
         }
@@ -254,9 +283,9 @@ public class ReservationService {
         }
 
         long minutes = java.time.Duration.between(r.getActualIn(), r.getActualOut()).toMinutes();
-        
+
         GlobalSettingsDTO settings = globalSettingsService.getSettings();
-        
+
         if (settings.getEntryGracePeriodMinutes() != null && minutes <= settings.getEntryGracePeriodMinutes()) {
             return 0.0;
         }
@@ -283,21 +312,21 @@ public class ReservationService {
 
         double amount = hours * rate;
 
-        // Apply daily maximum cap
         if (settings.getDailyMaximumCap() != null && settings.getDailyMaximumCap() > 0) {
             double days = Math.ceil(hours / 24.0);
-            if (days == 0) days = 1;
+            if (days == 0)
+                days = 1;
             double cap = days * settings.getDailyMaximumCap();
             if (amount > cap) {
                 amount = cap;
             }
         }
-        
-        // Apply overstay penalty
+
         if (settings.getMaximumParkingDurationHours() != null && settings.getMaximumParkingDurationHours() > 0) {
             if (hours > settings.getMaximumParkingDurationHours()) {
                 double overstayHours = hours - settings.getMaximumParkingDurationHours();
-                double penaltyRate = settings.getOverstayPenaltyRate() != null ? settings.getOverstayPenaltyRate() : rate * 2;
+                double penaltyRate = settings.getOverstayPenaltyRate() != null ? settings.getOverstayPenaltyRate()
+                        : rate * 2;
                 amount += overstayHours * penaltyRate;
             }
         }
@@ -343,7 +372,7 @@ public class ReservationService {
     public Reservation checkOutByQrToken(String qrToken) {
         Reservation r = reservationRepo.findByQrToken(qrToken)
                 .orElseThrow(() -> new IllegalArgumentException("Invalid QR code"));
-
+        assertHubAccess(r.getSlotId());
         if (!"CHECKED_IN".equals(r.getStatus())) {
             throw new IllegalStateException("Not in valid state for check-out: " + r.getStatus());
         }
@@ -365,7 +394,7 @@ public class ReservationService {
     public Reservation processQrScan(String qrToken) {
         Reservation r = reservationRepo.findByQrToken(qrToken)
                 .orElseThrow(() -> new IllegalArgumentException("Invalid QR code"));
-
+        
         return switch (r.getStatus()) {
             case "CONFIRMED" -> checkInByQrToken(qrToken);
             case "CHECKED_IN" -> checkOutByQrToken(qrToken);
@@ -377,6 +406,7 @@ public class ReservationService {
     }
 
     public ParkingSlot setSlotStatusManually(Long slotId, ParkingSlot.SlotStatus status) {
+        assertHubAccess(slotId);
         ParkingSlot slot = slotRepo.findById(slotId)
                 .orElseThrow(() -> new IllegalArgumentException("Invalid slotId"));
 

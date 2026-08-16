@@ -60,6 +60,30 @@ public class PaymentService {
     }
 
     @Transactional
+    public synchronized Payment update(Long id, Payment updated) {
+        Payment payment = getById(id);
+
+        if (updated.getReservationId() == null)
+            throw new IllegalArgumentException("reservationId is required");
+
+        if (updated.getAmount() == null || updated.getAmount().signum() <= 0)
+            throw new IllegalArgumentException("amount must be a positive value");
+
+        if (updated.getPaymentStatus() != null && !VALID_STATUSES.contains(updated.getPaymentStatus()))
+            throw new IllegalArgumentException("Invalid payment status: " + updated.getPaymentStatus());
+
+        if (updated.getPaymentMethod() != null && !VALID_METHODS.contains(updated.getPaymentMethod()))
+            throw new IllegalArgumentException("Invalid payment method: " + updated.getPaymentMethod());
+
+        payment.setReservationId(updated.getReservationId());
+        payment.setAmount(updated.getAmount());
+        payment.setPaymentMethod(updated.getPaymentMethod());
+        payment.setPaymentStatus(updated.getPaymentStatus());
+
+        return paymentRepository.save(payment);
+    }
+
+    @Transactional
     public synchronized Payment recordPayment(Long reservationId, Double amount, String method) {
         if (reservationId == null)
             throw new IllegalArgumentException("reservationId is required");

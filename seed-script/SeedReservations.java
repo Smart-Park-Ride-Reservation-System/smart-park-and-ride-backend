@@ -30,8 +30,6 @@ public class SeedReservations {
     private static final int MIN_DAYS_AHEAD = 1;
     private static final int MAX_DAYS_AHEAD = 14;
 
-    private static final String RUN_ID = String.valueOf(System.currentTimeMillis());
-
     // RFC 2606 reserves the ".invalid" TLD specifically for addresses that
     // are guaranteed to never resolve or exist — safer than ".com" for a
     // notification system that might actually try to send email, since it
@@ -88,6 +86,16 @@ public class SeedReservations {
         return "+947" + (prefix % 10) + rest;
     }
 
+    // firstname.lastnameN@example.invalid — reads like a normal test email
+    // instead of a name jammed against a millisecond timestamp. N is the
+    // 1-based slot index for this run, so it's small and unique per account
+    // created in a single run without needing a giant suffix. Re-running
+    // the script may collide with a previous run's emails; that's fine —
+    // signup failures are caught per-slot in main() and just get skipped.
+    private static String makeEmail(String firstName, String lastName, int n) {
+        return (firstName + "." + lastName + n).toLowerCase(Locale.ROOT) + "@" + EMAIL_DOMAIN;
+    }
+
     // Picks a random day between MIN_DAYS_AHEAD and MAX_DAYS_AHEAD from now,
     // and a random time on the half hour between 06:00 and 22:00, so
     // reservations are spread out instead of all landing on one slot.
@@ -106,8 +114,9 @@ public class SeedReservations {
 
         // /api/slots/search requires an authenticated COMMUTER or ADMIN, so
         // create a throwaway seed account up front and log in once, purely to
-        // get a token for searching slots.
-        String seedEmail = ("seedscanner" + RUN_ID + "@" + EMAIL_DOMAIN).toLowerCase(Locale.ROOT);
+        // get a token for searching slots. Small random suffix so re-running
+        // the script doesn't collide with a previous run's seed account.
+        String seedEmail = ("seed.scanner" + (10 + RNG.nextInt(90)) + "@" + EMAIL_DOMAIN).toLowerCase(Locale.ROOT);
         String seedPassword = "Test@1234";
         signup("Seed", "Scanner", seedEmail, seedPassword);
         String[] seedAuth = login(seedEmail, seedPassword);
@@ -129,8 +138,7 @@ public class SeedReservations {
                 // 1. create a brand-new account for this slot, with a random Sri Lankan name
                 String firstName = randomFrom(FIRST_NAMES);
                 String lastName  = randomFrom(LAST_NAMES);
-                String email = (firstName + "." + lastName + RUN_ID + "_" + count + "@" + EMAIL_DOMAIN)
-                        .toLowerCase(Locale.ROOT);
+                String email = makeEmail(firstName, lastName, i + 1);
                 String password = "Test@1234";
 
                 signup(firstName, lastName, email, password);
@@ -140,19 +148,31 @@ public class SeedReservations {
                 String token  = auth[0];
                 Long userId   = Long.parseLong(auth[1]);
 
-                // 3. make a reservation for this slot from this account, on a
-                //    randomized upcoming date/time
+                // 3. create a reservation for this slot from this account, on a
+                //    randomized upcoming date/time — mirrors the booking-details
+                //    page's POST /api/reservations payload exactly.
                 String scheduledIn = randomScheduledIn();
-                createReservation(token, userId, slotId, scheduledIn);
+                String phone = randomPhone();
+                String vehicleNo = randomVehicleNo();
+                Long reservationId = createReservation(token, userId, slotId, vehicleNo, scheduledIn, phone);
+
+                // 4. confirm payment — mirrors the payment-gateway page's
+                //    PUT /api/reservations/{id}/confirm-payment call. The
+                //    gateway's card fields (number/name/expiry/CVV) are
+                //    validated client-side only and never sent to the
+                //    backend, so there's nothing to fabricate here beyond
+                //    the confirm call itself.
+                confirmPayment(token, reservationId);
 
                 count++;
                 System.out.println("Account " + email + " reserved slotId=" + slotId
-                        + " scheduledIn=" + scheduledIn + " with fee 200");
+                        + " reservationId=" + reservationId + " scheduledIn=" + scheduledIn
+                        + " phone=" + phone + " — payment confirmed");
             } catch (Exception e) {
                 System.out.println("Failed slotId=" + slotId + ": " + e.getMessage());
             }
         }
-        System.out.println("Done. Total reservations created: " + count + " / " + TARGET_RESERVATIONS + " requested.");
+        System.out.println("Done. Total reservations created & paid: " + count + " / " + TARGET_RESERVATIONS + " requested.");
     }
 
     // ── signup ───────────────────────────────────────────────────────────────
@@ -266,10 +286,12 @@ public class SeedReservations {
     }
 
     // ── reservation creation ────────────────────────────────────────────────
-    private static void createReservation(String token, Long userId, long slotId, String scheduledIn) throws Exception {
-        String vehicleNo = randomVehicleNo();
-        String phone     = randomPhone();
-
+    // Mirrors the booking-details page's POST /api/reservations payload
+    // exactly (slotId, userId, vehicleNo, vehicleType, scheduledIn, phone).
+    // Returns the new reservationId, parsed from the response body, since
+    // confirmPayment() needs it next.
+    private static Long createReservation(String token, Long userId, long slotId,
+                                           String vehicleNo, String scheduledIn, String phone) throws Exception {
         String body = String.format(
             "{\"slotId\":%d,\"userId\":%d,\"vehicleNo\":\"%s\",\"vehicleType\":\"CAR\"," +
             "\"scheduledIn\":\"%s\",\"phone\":\"%s\"}",
@@ -285,7 +307,30 @@ public class SeedReservations {
 
         HttpResponse<String> res = client.send(req, HttpResponse.BodyHandlers.ofString());
         if (res.statusCode() != 200 && res.statusCode() != 201)
-            throw new RuntimeException("HTTP " + res.statusCode() + ": " + res.body());
+            throw new RuntimeException("Create reservation HTTP " + res.statusCode() + ": " + res.body());
+
+        Object root = Json.parse(res.body());
+        Object idVal = field(root, "reservationId");
+        if (idVal == null)
+            throw new RuntimeException("Reservation response missing reservationId: " + res.body());
+        return asLong(idVal);
+    }
+
+    // ── payment confirmation ────────────────────────────────────────────────
+    // Mirrors the payment-gateway page's PUT /api/reservations/{id}/confirm-payment
+    // call. No body — the gateway UI collects card details purely for
+    // client-side validation and never forwards them to the backend.
+    private static void confirmPayment(String token, Long reservationId) throws Exception {
+        HttpRequest req = HttpRequest.newBuilder()
+                .uri(URI.create(API_URL + "/api/reservations/" + reservationId + "/confirm-payment"))
+                .header("Content-Type", "application/json")
+                .header("Authorization", "Bearer " + token)
+                .PUT(HttpRequest.BodyPublishers.noBody())
+                .build();
+
+        HttpResponse<String> res = client.send(req, HttpResponse.BodyHandlers.ofString());
+        if (res.statusCode() != 200 && res.statusCode() != 201)
+            throw new RuntimeException("Confirm payment HTTP " + res.statusCode() + ": " + res.body());
     }
 
     // ── HTTP helpers ─────────────────────────────────────────────────────────

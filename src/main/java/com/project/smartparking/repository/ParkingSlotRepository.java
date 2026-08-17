@@ -30,5 +30,5 @@ public interface ParkingSlotRepository extends JpaRepository<ParkingSlot, Long> 
            "WHERE l.hub_id = :hubId AND s.status = 'AVAILABLE'",
            nativeQuery = true)
     List<ParkingSlot> findAvailableByHub(@Param("hubId") Long hubId);
-    Optional<ParkingSlot> findBySlotNumber(String slotNumber);
+    Optional<ParkingSlot> findBySlotCode(String slotCode);
 }

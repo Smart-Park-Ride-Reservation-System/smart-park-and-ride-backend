@@ -35,15 +35,14 @@ public class GateScanService {
 
     private ScanResult handleEntry(Reservation reservation, String gateId) {
         if (!"CONFIRMED".equals(reservation.status())) {
-            return ScanResult.rejected(
-                    "Reservation is not confirmed (current status: " + reservation.status() + ")");
+            return ScanResult.rejected("Reservation is not confirmed");
         }
 
         jdbcTemplate.update(
                 "UPDATE reservations SET status = 'CHECKED_IN', actual_in = ? WHERE reservation_id = ?",
                 Timestamp.from(Instant.now()), reservation.id());
 
-        openGate(gateId);
+        openDoor("in");
         setSlotReserved(reservation.slotId(), true);
 
         return ScanResult.success("Checked in — slot " + reservation.slotId(), reservation.id());
@@ -51,15 +50,14 @@ public class GateScanService {
 
     private ScanResult handleExit(Reservation reservation, String gateId) {
         if (!"CHECKED_IN".equals(reservation.status())) {
-            return ScanResult.rejected(
-                    "Reservation is not checked in (current status: " + reservation.status() + ")");
+            return ScanResult.rejected("Reservation is not checked in");
         }
 
         jdbcTemplate.update(
                 "UPDATE reservations SET status = 'COMPLETED', actual_out = ? WHERE reservation_id = ?",
                 Timestamp.from(Instant.now()), reservation.id());
 
-        openGate(gateId);
+        openDoor("out");
         setSlotReserved(reservation.slotId(), false);
 
         return ScanResult.success("Checked out — slot " + reservation.slotId(), reservation.id());
@@ -77,10 +75,12 @@ public class GateScanService {
         return results.isEmpty() ? null : results.get(0);
     }
 
-    private void openGate(String gateId) {
-        DatabaseReference gateRef = FirebaseDatabase.getInstance()
-                .getReference("gates/" + gateId + "/open");
-        gateRef.setValueAsync(true);
+    private void openDoor(String doorType) {
+        String path = doorType.equalsIgnoreCase("in") ? "in" : "out";
+        FirebaseDatabase.getInstance()
+                .getReference("door")
+                .child(path)
+                .setValueAsync("open");
     }
 
     private void setSlotReserved(Long slotId, boolean reserved) {

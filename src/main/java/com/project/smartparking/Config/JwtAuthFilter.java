@@ -25,8 +25,8 @@ public class JwtAuthFilter extends OncePerRequestFilter {
 
     @Override
     protected void doFilterInternal(HttpServletRequest request,
-            HttpServletResponse response,
-            FilterChain filterChain)
+                                    HttpServletResponse response,
+                                    FilterChain filterChain)
             throws ServletException, IOException {
 
         String authHeader = request.getHeader("Authorization");
@@ -36,21 +36,31 @@ public class JwtAuthFilter extends OncePerRequestFilter {
             return;
         }
 
-        String token = authHeader.substring(7);
+        String token = authHeader.substring(7).trim();
 
-        if (jwtService.isTokenValid(token)) {
-            String email = jwtService.extractEmail(token);
-            String role = jwtService.extractRole(token);
-            Long userId = jwtService.extractUserId(token);
-            Long hubId = jwtService.extractHubId(token);
+        if (token.isEmpty() || "undefined".equals(token) || "null".equals(token)) {
+            filterChain.doFilter(request, response);
+            return;
+        }
 
-            AuthenticatedUser principal = new AuthenticatedUser(email, userId, hubId, role);
+        try {
+            if (jwtService.isTokenValid(token)) {
+                String email = jwtService.extractEmail(token);
+                String role = jwtService.extractRole(token);
+                Long userId = jwtService.extractUserId(token);
+                Long hubId = jwtService.extractHubId(token);
 
-            UsernamePasswordAuthenticationToken auth = new UsernamePasswordAuthenticationToken(
-                    principal,
-                    null,
-                    List.of(new SimpleGrantedAuthority("ROLE_" + role)));
-            SecurityContextHolder.getContext().setAuthentication(auth);
+                AuthenticatedUser principal = new AuthenticatedUser(email, userId, hubId, role);
+
+                UsernamePasswordAuthenticationToken auth = new UsernamePasswordAuthenticationToken(
+                        principal,
+                        null,
+                        List.of(new SimpleGrantedAuthority("ROLE_" + role)));
+                SecurityContextHolder.getContext().setAuthentication(auth);
+            }
+        } catch (Exception e) {
+            logger.warn("JWT validation failed: " + e.getMessage());
+            SecurityContextHolder.clearContext();
         }
 
         filterChain.doFilter(request, response);

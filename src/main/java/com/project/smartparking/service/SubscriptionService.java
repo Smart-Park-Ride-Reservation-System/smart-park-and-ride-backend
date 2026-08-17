@@ -146,8 +146,7 @@ public class SubscriptionService {
                     if (pkg == null || pkg.getDurationDays() == null || pkg.getDurationDays() <= 0) {
                         return BigDecimal.ZERO;
                     }
-                    // Normalize each plan's price to a monthly-equivalent so a
-                    // daily pass and a monthly plan aren't just added at face value.
+                   
                     return pkg.getPrice()
                             .multiply(BigDecimal.valueOf(30))
                             .divide(BigDecimal.valueOf(pkg.getDurationDays()), 2, RoundingMode.HALF_UP);

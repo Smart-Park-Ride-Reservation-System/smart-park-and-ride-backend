@@ -8,6 +8,7 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
+import java.util.Optional;
 
 @Repository
 public interface ParkingSlotRepository extends JpaRepository<ParkingSlot, Long> {
@@ -16,7 +17,7 @@ public interface ParkingSlotRepository extends JpaRepository<ParkingSlot, Long> 
 
     void deleteByLotId(Long lotId);
 
-    List<ParkingSlot> findByLotId(Long lotId); // ✅ add this
+    List<ParkingSlot> findByLotId(Long lotId); 
 
     @Query(value = "SELECT s.* FROM parking_slots s " +
            "JOIN parking_lots l ON s.lot_id = l.lot_id " +
@@ -29,4 +30,5 @@ public interface ParkingSlotRepository extends JpaRepository<ParkingSlot, Long> 
            "WHERE l.hub_id = :hubId AND s.status = 'AVAILABLE'",
            nativeQuery = true)
     List<ParkingSlot> findAvailableByHub(@Param("hubId") Long hubId);
+    Optional<ParkingSlot> findBySlotNumber(String slotNumber);
 }

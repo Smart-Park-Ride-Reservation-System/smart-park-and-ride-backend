@@ -4,12 +4,13 @@ import com.project.smartparking.dto.GlobalSettingsDTO;
 import com.project.smartparking.service.GlobalSettingsService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/api/admin/settings")
 @RequiredArgsConstructor
-@CrossOrigin(origins = "*", maxAge = 3600) 
+@PreAuthorize("hasRole('ADMIN')")
 public class GlobalSettingsController {
 
     private final GlobalSettingsService globalSettingsService;

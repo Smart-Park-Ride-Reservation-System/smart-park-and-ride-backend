@@ -9,4 +9,7 @@ public record AuthenticatedUser(String email, Long userId, Long hubId, String ro
     public String getName() {
         return this.email;
     }
+    public String getEmail() {
+        return this.email;
+    }
 }

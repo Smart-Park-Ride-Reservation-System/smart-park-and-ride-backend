@@ -9,4 +9,5 @@ public class SubscriptionPurchaseRequest {
     private Long hubId;
     private Long lotId;
     private Long slotId;
+    private String email;
 }

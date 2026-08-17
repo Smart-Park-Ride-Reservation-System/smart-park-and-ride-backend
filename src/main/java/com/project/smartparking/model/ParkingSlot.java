@@ -27,9 +27,9 @@ public class ParkingSlot {
     @Builder.Default
     private SlotStatus status = SlotStatus.AVAILABLE;
 
-    @Column(name = "sensor_id")
-    private Long sensorId;
-
+    @OneToOne
+    @JoinColumn(name = "sensor_id", referencedColumnName = "sensor_id")
+    private Sensor sensor;
 
     public enum SlotStatus {
         AVAILABLE,

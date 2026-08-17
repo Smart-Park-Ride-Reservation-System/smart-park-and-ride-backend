@@ -11,5 +11,7 @@ public record SensorDTO(
         BigDecimal lastValue,
         String status,
         LocalDateTime createdAt,
-        String slotCode
+        String slotCode,
+        Integer gpioPin,
+        String zoneCode
 ) {}

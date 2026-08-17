@@ -1,5 +1,6 @@
 package com.project.smartparking.Config;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
@@ -14,8 +15,8 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 import org.springframework.security.web.header.writers.ReferrerPolicyHeaderWriter;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
+
 import java.util.List;
 
 @Configuration
@@ -23,148 +24,92 @@ import java.util.List;
 @EnableMethodSecurity
 public class SecurityConfig {
 
-        @Bean
-        public PasswordEncoder passwordEncoder() {
-                return new BCryptPasswordEncoder();
-        }
+    @Value("${cors.allowed.origins}")
+    private String allowedOrigins;
 
-        @Value("${cors.allowed.origins}")
-        private String allowedOrigins;
+    @Bean
+    public PasswordEncoder passwordEncoder() {
+        return new BCryptPasswordEncoder();
+    }
 
-        @Bean
-        public CorsConfigurationSource corsConfigurationSource() {
-                CorsConfiguration configuration = new CorsConfiguration();
-                configuration.setAllowedOrigins(List.of(allowedOrigins.split(",")));
-                configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
-                configuration.setAllowedHeaders(List.of("Authorization", "Content-Type", "Accept"));
-                configuration.setAllowCredentials(true);
+    @Bean
+    public CorsConfigurationSource corsConfigurationSource() {
+        CorsConfiguration configuration = new CorsConfiguration();
+        configuration.setAllowedOrigins(List.of(allowedOrigins.split(",")));
+        configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
+        configuration.setAllowedHeaders(List.of("Authorization", "Content-Type", "Accept"));
+        configuration.setAllowCredentials(true);
 
-                UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
-                source.registerCorsConfiguration("/**", configuration);
-                return source;
-        }
+        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+        source.registerCorsConfiguration("/**", configuration);
+        return source;
+    }
 
-        @Bean
-        public SecurityFilterChain filterChain(HttpSecurity http, JwtAuthFilter jwtAuthFilter) throws Exception {
-                http
-                                .headers(headers -> headers
-                                                .httpStrictTransportSecurity(hsts -> hsts
-                                                                .includeSubDomains(true)
-                                                                .preload(true)
-                                                                .maxAgeInSeconds(31536000))
-                                                .contentSecurityPolicy(csp -> csp
-                                                                .policyDirectives(
-                                                                                "default-src 'none'; frame-ancestors 'none'; base-uri 'none'"))
-                                                .referrerPolicy(referrer -> referrer
-                                                                .policy(ReferrerPolicyHeaderWriter.ReferrerPolicy.STRICT_ORIGIN_WHEN_CROSS_ORIGIN))
-                                                .frameOptions(frame -> frame.deny())
-                                                .contentTypeOptions(contentType -> {
-                                                })
+    @Bean
+    public SecurityFilterChain filterChain(HttpSecurity http, JwtAuthFilter jwtAuthFilter) throws Exception {
+        http
+            .headers(headers -> headers
+                .httpStrictTransportSecurity(hsts -> hsts
+                    .includeSubDomains(true)
+                    .preload(true)
+                    .maxAgeInSeconds(31536000))
+                .contentSecurityPolicy(csp -> csp
+                    .policyDirectives("default-src 'none'; frame-ancestors 'none'; base-uri 'none'"))
+                .referrerPolicy(referrer -> referrer
+                    .policy(ReferrerPolicyHeaderWriter.ReferrerPolicy.STRICT_ORIGIN_WHEN_CROSS_ORIGIN))
+                .frameOptions(frame -> frame.deny())
+                .permissionsPolicy(permissions -> permissions
+                    .policy("camera=(self), microphone=(), geolocation=()"))
+            )
+            .csrf(csrf -> csrf.disable())
+            .cors(cors -> cors.configurationSource(corsConfigurationSource()))
+            .sessionManagement(session -> session
+                .sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+            .authorizeHttpRequests(auth -> auth
+                // Public / Auth
+                .requestMatchers("/").permitAll()
+                .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
+                .requestMatchers("/api/auth/**").permitAll()
+                .requestMatchers(HttpMethod.GET, "/api/home").permitAll()
 
-                                                .permissionsPolicy(permissions -> permissions
-                                                                .policy("camera=(self), microphone=(), geolocation=()")))
-                                .csrf(csrf -> csrf.disable())
-                                .cors(cors -> cors.configurationSource(corsConfigurationSource()))
-                                .sessionManagement(session -> session
-                                                .sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-                                .authorizeHttpRequests(auth -> auth
-                                                .requestMatchers("/").permitAll()
-                                                .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
-                                                .requestMatchers("/api/auth/**").permitAll()
+                // Payments (Webhooks/Init)
+                .requestMatchers(HttpMethod.GET, "/api/payments/payhere/init").permitAll()
+                .requestMatchers(HttpMethod.POST, "/api/payments/payhere/notify").permitAll()
+                .requestMatchers("/api/payments/**").hasAnyRole("ADMIN", "HUB_ADMIN", "ATTENDANT")
 
-                                                // ---- Home ----
-                                                .requestMatchers(HttpMethod.GET, "/api/home").permitAll()
+                // Slots
+                .requestMatchers(HttpMethod.POST, "/api/slots/generate").hasRole("ADMIN")
+                .requestMatchers(HttpMethod.GET, "/api/slots/**").permitAll()
+                .requestMatchers(HttpMethod.POST, "/api/slots/**").hasAnyRole("ADMIN", "HUB_ADMIN", "ATTENDANT")
+                .requestMatchers(HttpMethod.PUT, "/api/slots/**").hasAnyRole("ADMIN", "HUB_ADMIN", "ATTENDANT")
+                .requestMatchers(HttpMethod.DELETE, "/api/slots/**").hasAnyRole("ADMIN", "HUB_ADMIN")
 
-                                                // ---- Slots ----
+                // Reservations
+                .requestMatchers(HttpMethod.PUT, "/api/reservations/gate-*/scan").hasAnyRole("ATTENDANT", "HUB_ADMIN", "ADMIN")
+                .requestMatchers(HttpMethod.PUT, "/api/reservations/checkin", "/api/reservations/*/checkin").hasAnyRole("ATTENDANT", "HUB_ADMIN", "ADMIN")
+                .requestMatchers(HttpMethod.PUT, "/api/reservations/*/checkout").hasAnyRole("ATTENDANT", "HUB_ADMIN", "ADMIN")
+                .requestMatchers(HttpMethod.PUT, "/api/reservations/*/paid").hasAnyRole("ATTENDANT", "HUB_ADMIN", "ADMIN")
+                .requestMatchers(HttpMethod.DELETE, "/api/reservations/**").hasRole("ADMIN")
+                .requestMatchers("/api/reservations/**").hasAnyRole("COMMUTER", "ATTENDANT", "HUB_ADMIN", "ADMIN")
 
-                                                .requestMatchers(HttpMethod.POST, "/api/slots/generate")
-                                                .hasRole("ADMIN")
-                                                .requestMatchers(HttpMethod.GET, "/api/slots/search").permitAll()
-                                                .requestMatchers(HttpMethod.GET, "/api/slots/**").permitAll()
-                                                .requestMatchers(HttpMethod.POST, "/api/slots/**")
-                                                .hasAnyRole("ADMIN", "HUB_ADMIN", "ATTENDANT")
-                                                .requestMatchers(HttpMethod.PUT, "/api/slots/**")
-                                                .hasAnyRole("ADMIN", "HUB_ADMIN", "ATTENDANT")
-                                                .requestMatchers(HttpMethod.DELETE, "/api/slots/**")
-                                                .hasAnyRole("ADMIN", "HUB_ADMIN")
+                // Lots & Hubs
+                .requestMatchers(HttpMethod.GET, "/api/lots/**", "/api/hubs/**").permitAll()
+                .requestMatchers(HttpMethod.POST, "/api/hubs/**").hasRole("ADMIN")
+                .requestMatchers(HttpMethod.PUT, "/api/hubs/**").hasAnyRole("ADMIN", "HUB_ADMIN")
+                .requestMatchers(HttpMethod.DELETE, "/api/hubs/**").hasRole("ADMIN")
+                .requestMatchers("/api/lots/**").hasAnyRole("ADMIN", "HUB_ADMIN")
 
-                                                // ---- Reservations ----
+                // Users & AI
+                .requestMatchers("/api/users/**", "/api/ai-insights").hasRole("ADMIN")
 
-                                                .requestMatchers(HttpMethod.PUT, "/api/reservations/gate-a/scan")
-                                                .hasAnyRole("ATTENDANT", "HUB_ADMIN", "ADMIN")
-                                                .requestMatchers(HttpMethod.PUT, "/api/reservations/gate-b/scan")
-                                                .hasAnyRole("ATTENDANT", "HUB_ADMIN", "ADMIN")
-                                                .requestMatchers(HttpMethod.PUT, "/api/reservations/checkin")
-                                                .hasAnyRole("ATTENDANT", "HUB_ADMIN", "ADMIN")
-                                                .requestMatchers(HttpMethod.PUT, "/api/reservations/*/checkin")
-                                                .hasAnyRole("ATTENDANT", "HUB_ADMIN", "ADMIN")
-                                                .requestMatchers(HttpMethod.PUT, "/api/reservations/*/checkout")
-                                                .hasAnyRole("ATTENDANT", "HUB_ADMIN", "ADMIN")
-                                                .requestMatchers(HttpMethod.PUT, "/api/reservations/*/paid")
-                                                .hasAnyRole("ATTENDANT", "HUB_ADMIN", "ADMIN")
-                                                .requestMatchers(HttpMethod.PUT, "/api/reservations/*/confirm-payment")
-                                                .hasAnyRole("COMMUTER", "ATTENDANT", "HUB_ADMIN", "ADMIN")
+                // Subscriptions
+                .requestMatchers(HttpMethod.GET, "/api/subscriptions/**").permitAll()
+                .requestMatchers("/api/subscriptions/**").hasAnyRole("COMMUTER", "ADMIN")
 
-                                                .requestMatchers(HttpMethod.GET, "/api/reservations")
-                                                .hasAnyRole("ATTENDANT", "HUB_ADMIN", "ADMIN")
-                                                .requestMatchers(HttpMethod.DELETE, "/api/reservations/**")
-                                                .hasAnyRole("ADMIN")
+                .anyRequest().authenticated()
+            )
+            .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
 
-                                                .requestMatchers(HttpMethod.GET, "/api/reservations/user/**")
-                                                .hasAnyRole("COMMUTER", "ATTENDANT", "HUB_ADMIN", "ADMIN")
-                                                .requestMatchers(HttpMethod.GET, "/api/reservations/**")
-                                                .hasAnyRole("COMMUTER", "ATTENDANT", "HUB_ADMIN", "ADMIN")
-                                                .requestMatchers(HttpMethod.POST, "/api/reservations")
-                                                .hasAnyRole("COMMUTER", "ATTENDANT", "HUB_ADMIN", "ADMIN")
-                                                .requestMatchers(HttpMethod.PUT, "/api/reservations/*/cancel")
-                                                .hasAnyRole("COMMUTER", "ATTENDANT", "HUB_ADMIN", "ADMIN")
-                                                .requestMatchers(HttpMethod.PUT, "/api/reservations/**")
-                                                .hasAnyRole("COMMUTER", "ATTENDANT", "HUB_ADMIN", "ADMIN")
-
-                                                // ---- Payments ----
-                                                .requestMatchers(HttpMethod.GET, "/api/payments/payhere/init")
-                                                .permitAll()
-                                                .requestMatchers(HttpMethod.POST, "/api/payments/payhere/notify")
-                                                .permitAll()
-                                                .requestMatchers("/api/payments", "/api/payments/**")
-                                                .hasAnyRole("ADMIN", "HUB_ADMIN", "ATTENDANT")
-
-                                                // ---- Lots ----
-                                                .requestMatchers(HttpMethod.GET, "/api/lots", "/api/lots/**")
-                                                .permitAll()
-                                                .requestMatchers(HttpMethod.POST, "/api/lots", "/api/lots/**")
-                                                .hasAnyRole("ADMIN", "HUB_ADMIN")
-                                                .requestMatchers(HttpMethod.PUT, "/api/lots", "/api/lots/**")
-                                                .hasAnyRole("ADMIN", "HUB_ADMIN")
-                                                .requestMatchers(HttpMethod.DELETE, "/api/lots", "/api/lots/**")
-                                                .hasAnyRole("ADMIN", "HUB_ADMIN")
-
-                                                // ---- Users ----
-                                                .requestMatchers("/api/users/**").hasRole("ADMIN")
-
-                                                // ---- Hubs ----
-
-                                                .requestMatchers(HttpMethod.GET, "/api/hubs/**").permitAll()
-                                                .requestMatchers(HttpMethod.POST, "/api/hubs/**").hasRole("ADMIN")
-                                                .requestMatchers(HttpMethod.PUT, "/api/hubs/**")
-                                                .hasAnyRole("ADMIN", "HUB_ADMIN")
-                                                .requestMatchers(HttpMethod.DELETE, "/api/hubs/**").hasRole("ADMIN")
-
-                                                .requestMatchers("/api/ai-insights").hasRole("ADMIN")
-
-                                                .requestMatchers(HttpMethod.GET, "/api/subscriptions/**").permitAll()
-                                                .requestMatchers(HttpMethod.POST, "/api/subscriptions/**")
-                                                .hasAnyRole("COMMUTER", "ADMIN")
-                                                .requestMatchers(HttpMethod.PUT, "/api/subscriptions/**")
-                                                .hasAnyRole("COMMUTER", "ADMIN")
-                                                .requestMatchers(HttpMethod.DELETE, "/api/subscriptions/**")
-                                                .hasAnyRole("COMMUTER", "ADMIN")
-                                                .requestMatchers(HttpMethod.PATCH, "/api/subscriptions/**")
-                                                .hasAnyRole("COMMUTER", "ADMIN")
-
-                                                .anyRequest().authenticated())
-                                .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
-
-                return http.build();
-        }
+        return http.build();
+    }
 }

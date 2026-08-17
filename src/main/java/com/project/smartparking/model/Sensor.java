@@ -21,6 +21,12 @@ public class Sensor {
     @Column(name = "slot_id")
     private Long slotId;
 
+    @Column(name = "gpio_pin")
+    private Integer gpioPin; // Hardware pin on ESP32 (e.g. 34, 35)
+
+    @Column(name = "zone_code")
+    private String zoneCode; // Zone identifier (e.g. "A")
+
     @Column(name = "sensor_type")
     private String sensorType; 
 
@@ -38,6 +44,6 @@ public class Sensor {
     @PrePersist
     protected void onCreate() {
         this.createdAt = LocalDateTime.now();
-        if (this.status == null) this.status = "OFFLINE"; // Default for prototype
+        if (this.status == null) this.status = "OFFLINE";
     }
 }

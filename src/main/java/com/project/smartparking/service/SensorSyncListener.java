@@ -55,13 +55,12 @@ public class SensorSyncListener {
         });
     }
 
-    private void updateSlotStatusInDb(String slotNumber, boolean occupied) {
-        slotRepo.findBySlotNumber(slotNumber).ifPresent(slot -> {
+    private void updateSlotStatusInDb(String slotCode, boolean occupied) {
+        slotRepo.findBySlotCode(slotCode).ifPresent(slot -> {
             if (slot.getStatus() == SlotStatus.OUT_OF_SERVICE) {
                 return;
             }
 
-            // Don't mark as AVAILABLE if a reservation is active
             boolean hasActiveReservation = !reservationRepo
                     .findBySlotIdAndStatusIn(slot.getSlotId(), ACTIVE_RESERVATION_STATUSES)
                     .isEmpty();
@@ -74,7 +73,7 @@ public class SensorSyncListener {
             if (slot.getStatus() != newStatus) {
                 slot.setStatus(newStatus);
                 slotRepo.save(slot);
-                log.info("Live Update: Slot {} is now {}", slotNumber, newStatus);
+                log.info("Live Update: Slot {} is now {}", slotCode, newStatus);
             }
         });
     }

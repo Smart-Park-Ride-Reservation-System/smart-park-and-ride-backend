@@ -26,7 +26,9 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import lombok.extern.slf4j.Slf4j;
 
+@Slf4j
 @Service
 public class ReservationService {
 
@@ -355,15 +357,18 @@ public class ReservationService {
 
         if (settings.getDailyMaximumCap() != null && settings.getDailyMaximumCap() > 0) {
             double days = Math.ceil(hours / 24.0);
-            if (days == 0) days = 1;
+            if (days == 0)
+                days = 1;
             double cap = days * settings.getDailyMaximumCap();
-            if (amount > cap) amount = cap;
+            if (amount > cap)
+                amount = cap;
         }
 
         if (settings.getMaximumParkingDurationHours() != null && settings.getMaximumParkingDurationHours() > 0) {
             if (hours > settings.getMaximumParkingDurationHours()) {
                 double overstayHours = hours - settings.getMaximumParkingDurationHours();
-                double penaltyRate = settings.getOverstayPenaltyRate() != null ? settings.getOverstayPenaltyRate() : rate * 2;
+                double penaltyRate = settings.getOverstayPenaltyRate() != null ? settings.getOverstayPenaltyRate()
+                        : rate * 2;
                 amount += overstayHours * penaltyRate;
             }
         }
@@ -387,6 +392,7 @@ public class ReservationService {
     private void expire(Reservation r) {
         r.setStatus("EXPIRED");
         reservationRepo.save(r);
+        log.info("[ReservationService] Reservation {} for slot {} expired", r.getReservationId(), r.getSlotId());
         freeSlotIfNoActiveReservation(r.getSlotId());
     }
 
@@ -398,9 +404,22 @@ public class ReservationService {
 
         if (!stillActive) {
             slotRepo.findById(slotId).ifPresent(slot -> {
-                slot.setStatus(ParkingSlot.SlotStatus.AVAILABLE);
-                slotRepo.save(slot);
-                syncSlotToFirebase(slot, false);
+                // Keep slot marked OCCUPIED if hardware sensors currently detect a physical
+                // vehicle!
+                if (slot.getStatus() == ParkingSlot.SlotStatus.OCCUPIED) {
+                    log.info(
+                            "[ReservationService] Reservation ended for slot {}, but vehicle is physically present. Keeping status OCCUPIED.",
+                            slotId);
+                    return;
+                }
+
+                // If no vehicle is present, safely revert to AVAILABLE
+                if (slot.getStatus() != ParkingSlot.SlotStatus.OUT_OF_SERVICE) {
+                    slot.setStatus(ParkingSlot.SlotStatus.AVAILABLE);
+                    slotRepo.save(slot);
+                    syncSlotToFirebase(slot, false);
+                    log.info("[ReservationService] Slot {} freed and marked AVAILABLE", slotId);
+                }
             });
         }
     }

@@ -1,8 +1,10 @@
 package com.project.smartparking.controller;
 
+import com.project.smartparking.model.ParkingSlot;
 import com.project.smartparking.model.Reservation;
 import com.project.smartparking.service.ReservationService;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
@@ -73,6 +75,16 @@ public class ReservationController {
         return ResponseEntity.ok(reservationService.markPaid(id));
     }
 
+    // --- MANUAL OVERRIDE ENDPOINT ---
+    @PutMapping("/slots/{slotId}/status")
+    @PreAuthorize("hasAnyRole('ATTENDANT', 'ADMIN')")
+    public ResponseEntity<ParkingSlot> setSlotStatusManually(
+            @PathVariable Long slotId, 
+            @RequestParam ParkingSlot.SlotStatus status) {
+        return ResponseEntity.ok(reservationService.setSlotStatusManually(slotId, status));
+    }
+
+    // --- QR CHECK-IN / CHECK-OUT ENDPOINTS ---
     @PutMapping("/checkin")
     @PreAuthorize("hasAnyRole('ATTENDANT', 'ADMIN')")
     public ResponseEntity<?> checkInByCode(@RequestParam String code) {
@@ -114,10 +126,10 @@ public class ReservationController {
                     "message", action + " — slot #" + r.getSlotId(),
                     "reservationId", r.getReservationId()));
         } catch (IllegalStateException | IllegalArgumentException e) {
-            return ResponseEntity.ok(Map.of(
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of(
                     "ok", false,
                     "message", e.getMessage() != null ? e.getMessage() : "Scan rejected",
-                    "reservationId", (Object) null));
+                    "reservationId", null));
         }
     }
 }

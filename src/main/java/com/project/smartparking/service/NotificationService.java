@@ -9,7 +9,6 @@ import com.project.smartparking.repository.UserRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
-
 import java.util.List;
 
 @Service
@@ -19,12 +18,13 @@ public class NotificationService {
     private NotificationRepository notificationRepo;
 
     @Autowired
-    private EmailService emailService;  
+    private EmailService emailService;
 
     @Autowired
     private UserRepository userRepo;
 
-    public Notification notify(Long userId, String title, String message, NotificationType type) {
+    // NotificationService.java
+    public Notification notify(Long userId, String title, String message, NotificationType type, boolean sendEmail) {
         Notification notification = new Notification();
         notification.setUserId(userId);
         notification.setTitle(title);
@@ -34,7 +34,7 @@ public class NotificationService {
 
         Notification saved = notificationRepo.save(notification);
 
-        if (type == NotificationType.EMAIL) {
+        if (sendEmail) {
             userRepo.findById(userId).ifPresent(user -> {
                 if (user.getEmail() != null && !user.getEmail().trim().isEmpty()) {
                     emailService.send(user.getEmail(), title, message);
@@ -45,10 +45,10 @@ public class NotificationService {
         return saved;
     }
 
-    public int notifyMany(List<User> users, String title, String message, NotificationType type) {
+    public int notifyMany(List<User> users, String title, String message, NotificationType type, boolean sendEmail) {
         int count = 0;
         for (User user : users) {
-            notify(user.getUserId(), title, message, type);
+            notify(user.getUserId(), title, message, type, sendEmail);
             count++;
         }
         return count;

@@ -8,5 +8,8 @@ import java.util.List;
 
 @Repository
 public interface ParkingLotRepository extends JpaRepository<ParkingLot, Long> {
+
     List<ParkingLot> findByHub_HubId(Long hubId);
+
+    List<ParkingLot> findByStatus(ParkingLot.LotStatus status);
 }

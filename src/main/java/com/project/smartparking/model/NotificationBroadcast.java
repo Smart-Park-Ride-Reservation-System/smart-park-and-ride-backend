@@ -23,16 +23,14 @@ public class NotificationBroadcast {
     @Column(name = "message")
     private String message;
 
-    // Dashboard display style: success/payment/warning/info
-    // NOT the same as NotificationType (EMAIL/SYSTEM/SMS) used by the dispatcher
     @Column(name = "display_type")
     private String displayType;
 
     @Column(name = "status")
-    private String status; // SENT / SCHEDULED / FAILED
+    private String status;
 
     @Column(name = "audience")
-    private String audience; // ALL_USERS / HUB / SINGLE_USER
+    private String audience;
 
     @Column(name = "audience_label")
     private String audienceLabel;
@@ -57,6 +55,9 @@ public class NotificationBroadcast {
 
     @Column(name = "created_at")
     private Timestamp createdAt;
+
+    @Column(name = "send_email")
+    private boolean sendEmail;
 
     @PrePersist
     protected void onCreate() {

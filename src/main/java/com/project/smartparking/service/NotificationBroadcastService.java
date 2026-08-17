@@ -48,8 +48,6 @@ public class NotificationBroadcastService {
         broadcast.setHubId(req.getHubId());
         broadcast.setSingleUserId(req.getUserId());
 
-        // Scheduled for later -> save as SCHEDULED, don't send yet.
-        // ScheduledBroadcastDispatcher picks these up.
         if (req.getScheduledFor() != null && !req.getScheduledFor().isBlank()) {
             try {
                 Timestamp scheduled = Timestamp.valueOf(
@@ -57,6 +55,7 @@ public class NotificationBroadcastService {
                 broadcast.setScheduledFor(scheduled);
                 broadcast.setStatus("SCHEDULED");
                 broadcast.setRecipientCount(0);
+                broadcast.setSendEmail(req.isSendEmail()); 
                 broadcast.setAudienceLabel(buildAudienceLabel(req));
                 return broadcastRepo.save(broadcast);
             } catch (DateTimeParseException e) {
@@ -82,7 +81,7 @@ public class NotificationBroadcastService {
             }
 
             int count = notificationService.notifyMany(
-                    recipients, req.getTitle(), req.getMessage(), NotificationType.SYSTEM);
+                    recipients, req.getTitle(), req.getMessage(), NotificationType.SYSTEM, req.isSendEmail());
 
             broadcast.setStatus("SENT");
             broadcast.setRecipientCount(count);
@@ -112,7 +111,8 @@ public class NotificationBroadcastService {
         req.setAudience(old.getAudience());
         req.setHubId(old.getHubId());
         req.setUserId(old.getSingleUserId());
-        req.setScheduledFor(null); // resend always sends now
+        req.setScheduledFor(null);
+        req.setSendEmail(old.isSendEmail());
 
         return send(req);
     }
@@ -146,8 +146,8 @@ public class NotificationBroadcastService {
             }
 
             int count = notificationService.notifyMany(
-                    recipients, broadcast.getTitle(), broadcast.getMessage(), NotificationType.SYSTEM);
-
+                    recipients, broadcast.getTitle(), broadcast.getMessage(), NotificationType.SYSTEM,
+                    broadcast.isSendEmail());
             broadcast.setStatus("SENT");
             broadcast.setRecipientCount(count);
             broadcast.setSentAt(Timestamp.valueOf(LocalDateTime.now()));
@@ -184,9 +184,12 @@ public class NotificationBroadcastService {
     }
 
     private String buildAudienceLabel(NotificationSendRequest req) {
-        if ("ALL_USERS".equals(req.getAudience())) return "All users";
-        if ("HUB".equals(req.getAudience())) return "Hub #" + req.getHubId();
-        if ("SINGLE_USER".equals(req.getAudience())) return "Single user";
+        if ("ALL_USERS".equals(req.getAudience()))
+            return "All users";
+        if ("HUB".equals(req.getAudience()))
+            return "Hub #" + req.getHubId();
+        if ("SINGLE_USER".equals(req.getAudience()))
+            return "Single user";
         return req.getAudience();
     }
 }

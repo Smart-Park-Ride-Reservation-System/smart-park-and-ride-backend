@@ -11,18 +11,6 @@ import org.springframework.stereotype.Component;
 import java.time.LocalDateTime;
 import java.util.List;
 
-/**
- * Polls for reservations starting in ~5 minutes and sends a reminder
- * email. Polling (not per-reservation scheduled tasks) is deliberate:
- * state lives in the DB so a restart never loses a pending reminder.
- *
- * Requires a `reminder_sent` boolean column and `scheduled_in`
- * datetime column on the reservations table, plus this repository
- * method on ReservationRepository:
- *
- *   List<Reservation> findByScheduledInBetweenAndReminderSentFalse(
- *       LocalDateTime start, LocalDateTime end);
- */
 @Component
 public class ReminderScheduler {
 
@@ -46,8 +34,8 @@ public class ReminderScheduler {
                     r.getUserId(),
                     "Reservation reminder",
                     "Your reservation starts in 5 minutes at " + r.getScheduledIn(),
-                    NotificationType.EMAIL
-            );
+                    NotificationType.SYSTEM,
+                    true);
             r.setReminderSent(true);
             reservationRepo.save(r);
         }

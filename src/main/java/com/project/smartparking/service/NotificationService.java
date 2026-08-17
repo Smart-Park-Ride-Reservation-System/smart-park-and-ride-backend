@@ -45,11 +45,6 @@ public class NotificationService {
         return saved;
     }
 
-    /**
-     * Bulk variant for admin broadcasts - notifies many users at once
-     * under the same title/message/type. Returns how many DB records
-     * were written (not how many emails succeeded).
-     */
     public int notifyMany(List<User> users, String title, String message, NotificationType type) {
         int count = 0;
         for (User user : users) {

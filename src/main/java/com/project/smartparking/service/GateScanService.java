@@ -2,6 +2,7 @@ package com.project.smartparking.service;
 
 import com.google.firebase.database.DatabaseReference;
 import com.google.firebase.database.FirebaseDatabase;
+import com.project.smartparking.model.Reservation;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
@@ -21,7 +22,7 @@ public class GateScanService {
     }
 
     public ScanResult handleScan(String qrToken, String gateId, GateType gateType) {
-        Reservation reservation = findReservationByToken(qrToken);
+        ReservationData reservation = findReservationByToken(qrToken);
 
         if (reservation == null) {
             return ScanResult.rejected("QR code not recognized");
@@ -33,8 +34,8 @@ public class GateScanService {
         };
     }
 
-    private ScanResult handleEntry(Reservation reservation, String gateId) {
-        if (!"CONFIRMED".equals(reservation.status())) {
+    private ScanResult handleEntry(ReservationData reservation, String gateId) {
+        if (!"CONFIRMED".equalsIgnoreCase(reservation.status())) {
             return ScanResult.rejected("Reservation is not confirmed");
         }
 
@@ -43,13 +44,13 @@ public class GateScanService {
                 Timestamp.from(Instant.now()), reservation.id());
 
         openDoor("in");
-        setSlotReserved(reservation.slotId(), true);
+        syncSlotReservation(reservation.slotId(), true);
 
-        return ScanResult.success("Checked in — slot " + reservation.slotId(), reservation.id());
+        return ScanResult.success("Checked in — slot #" + reservation.slotId(), reservation.id());
     }
 
-    private ScanResult handleExit(Reservation reservation, String gateId) {
-        if (!"CHECKED_IN".equals(reservation.status())) {
+    private ScanResult handleExit(ReservationData reservation, String gateId) {
+        if (!"CHECKED_IN".equalsIgnoreCase(reservation.status())) {
             return ScanResult.rejected("Reservation is not checked in");
         }
 
@@ -58,15 +59,15 @@ public class GateScanService {
                 Timestamp.from(Instant.now()), reservation.id());
 
         openDoor("out");
-        setSlotReserved(reservation.slotId(), false);
+        syncSlotReservation(reservation.slotId(), false);
 
-        return ScanResult.success("Checked out — slot " + reservation.slotId(), reservation.id());
+        return ScanResult.success("Checked out — slot #" + reservation.slotId(), reservation.id());
     }
 
-    private Reservation findReservationByToken(String qrToken) {
+    private ReservationData findReservationByToken(String qrToken) {
         String sql = "SELECT reservation_id, slot_id, status FROM reservations WHERE qr_token = ?";
-        List<Reservation> results = jdbcTemplate.query(sql,
-                (rs, rowNum) -> new Reservation(
+        List<ReservationData> results = jdbcTemplate.query(sql,
+                (rs, rowNum) -> new ReservationData(
                         rs.getLong("reservation_id"),
                         rs.getLong("slot_id"),
                         rs.getString("status")),
@@ -83,23 +84,28 @@ public class GateScanService {
                 .setValueAsync("open");
     }
 
-    private void setSlotReserved(Long slotId, boolean reserved) {
-        DatabaseReference slotRef = FirebaseDatabase.getInstance()
-                .getReference("slots/" + slotId);
+    private void syncSlotReservation(Long slotId, boolean reserved) {
+        String sql = "SELECT zone, slot_number FROM parking_slots WHERE slot_id = ?";
+        jdbcTemplate.query(sql, rs -> {
+            String zone = rs.getString("zone");
+            String slotNum = rs.getString("slot_number");
 
-        Map<String, Object> update = new HashMap<>();
-        update.put("reserved", reserved);
-        update.put("updatedAt", Instant.now().toString());
+            DatabaseReference slotRef = FirebaseDatabase.getInstance()
+                    .getReference("sensor/parking/" + zone + "/" + slotNum);
 
-        slotRef.updateChildrenAsync(update);
+            Map<String, Object> update = new HashMap<>();
+            update.put("reserved", reserved);
+            update.put("updatedAt", Instant.now().toString());
+
+            slotRef.updateChildrenAsync(update);
+        }, slotId);
     }
 
     public enum GateType {
         ENTRY, EXIT
     }
 
-    public record Reservation(Long id, Long slotId, String status) {
-    }
+    public record ReservationData(Long id, Long slotId, String status) {}
 
     public record ScanResult(boolean ok, String message, Long reservationId) {
         public static ScanResult success(String message, Long reservationId) {

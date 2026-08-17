@@ -2,21 +2,21 @@ package com.project.smartparking.service;
 
 import com.google.firebase.database.DatabaseReference;
 import com.google.firebase.database.FirebaseDatabase;
+import com.project.smartparking.Config.AuthenticatedUser;
+import com.project.smartparking.dto.GlobalSettingsDTO;
+import com.project.smartparking.model.ParkingLot;
 import com.project.smartparking.model.ParkingSlot;
 import com.project.smartparking.model.Payment;
 import com.project.smartparking.model.Reservation;
+import com.project.smartparking.repository.ParkingLotRepository;
 import com.project.smartparking.repository.ParkingSlotRepository;
 import com.project.smartparking.repository.PaymentRepository;
 import com.project.smartparking.repository.ReservationRepository;
-import com.project.smartparking.dto.GlobalSettingsDTO;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.scheduling.annotation.Scheduled;
-import org.springframework.stereotype.Service;
-import com.project.smartparking.Config.AuthenticatedUser;
-import com.project.smartparking.model.ParkingLot;
-import com.project.smartparking.repository.ParkingLotRepository;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
@@ -195,13 +195,39 @@ public class ReservationService {
         r.setActualIn(LocalDateTime.now());
         r.setStatus("CHECKED_IN");
 
+        // Update Slot
         slotRepo.findById(r.getSlotId()).ifPresent(slot -> {
             slot.setStatus(ParkingSlot.SlotStatus.OCCUPIED);
             slotRepo.save(slot);
             syncSlotToFirebase(slot, false);
         });
 
-        openGate("entry-gate");
+        // Trigger Entry Gate Servo
+        openGate("in");
+
+        return reservationRepo.save(r);
+    }
+
+    public Reservation checkOutByQrToken(String qrToken) {
+        Reservation r = reservationRepo.findByQrToken(qrToken)
+                .orElseThrow(() -> new IllegalArgumentException("Invalid QR code"));
+        assertHubAccess(r.getSlotId());
+        if (!"CHECKED_IN".equals(r.getStatus())) {
+            throw new IllegalStateException("Not in valid state for check-out: " + r.getStatus());
+        }
+
+        r.setActualOut(LocalDateTime.now());
+        r.setStatus("COMPLETED");
+
+        // Update Slot
+        slotRepo.findById(r.getSlotId()).ifPresent(slot -> {
+            slot.setStatus(ParkingSlot.SlotStatus.AVAILABLE);
+            slotRepo.save(slot);
+            syncSlotToFirebase(slot, false);
+        });
+
+        // Trigger Exit Gate Servo
+        openGate("out");
 
         return reservationRepo.save(r);
     }
@@ -222,6 +248,8 @@ public class ReservationService {
             syncSlotToFirebase(slot, false);
         });
 
+        openGate("in");
+
         return reservationRepo.save(r);
     }
 
@@ -241,7 +269,23 @@ public class ReservationService {
             syncSlotToFirebase(slot, false);
         });
 
+        openGate("out");
+
         return reservationRepo.save(r);
+    }
+
+    public Reservation processQrScan(String qrToken) {
+        Reservation r = reservationRepo.findByQrToken(qrToken)
+                .orElseThrow(() -> new IllegalArgumentException("Invalid QR code"));
+
+        return switch (r.getStatus()) {
+            case "CONFIRMED" -> checkInByQrToken(qrToken);
+            case "CHECKED_IN" -> checkOutByQrToken(qrToken);
+            case "COMPLETED", "PAID" -> throw new IllegalStateException("Already checked out.");
+            case "EXPIRED", "CANCELLED" ->
+                throw new IllegalStateException("Reservation is no longer valid: " + r.getStatus());
+            default -> throw new IllegalStateException("Unexpected status: " + r.getStatus());
+        };
     }
 
     @Transactional
@@ -277,13 +321,11 @@ public class ReservationService {
     }
 
     private double calculateParkingCharge(Reservation r) {
-
         if (subscriptionService.getActiveSubscription(r.getUserId()) != null) {
             return 0.0;
         }
 
         long minutes = java.time.Duration.between(r.getActualIn(), r.getActualOut()).toMinutes();
-
         GlobalSettingsDTO settings = globalSettingsService.getSettings();
 
         if (settings.getEntryGracePeriodMinutes() != null && minutes <= settings.getEntryGracePeriodMinutes()) {
@@ -291,7 +333,6 @@ public class ReservationService {
         }
 
         double hours = minutes / 60.0;
-
         double rate;
         switch (r.getVehicleType().toUpperCase()) {
             case "BIKE":
@@ -314,19 +355,15 @@ public class ReservationService {
 
         if (settings.getDailyMaximumCap() != null && settings.getDailyMaximumCap() > 0) {
             double days = Math.ceil(hours / 24.0);
-            if (days == 0)
-                days = 1;
+            if (days == 0) days = 1;
             double cap = days * settings.getDailyMaximumCap();
-            if (amount > cap) {
-                amount = cap;
-            }
+            if (amount > cap) amount = cap;
         }
 
         if (settings.getMaximumParkingDurationHours() != null && settings.getMaximumParkingDurationHours() > 0) {
             if (hours > settings.getMaximumParkingDurationHours()) {
                 double overstayHours = hours - settings.getMaximumParkingDurationHours();
-                double penaltyRate = settings.getOverstayPenaltyRate() != null ? settings.getOverstayPenaltyRate()
-                        : rate * 2;
+                double penaltyRate = settings.getOverstayPenaltyRate() != null ? settings.getOverstayPenaltyRate() : rate * 2;
                 amount += overstayHours * penaltyRate;
             }
         }
@@ -355,8 +392,7 @@ public class ReservationService {
 
     private void freeSlotIfNoActiveReservation(Long slotId) {
         boolean stillActive = reservationRepo
-                .findBySlotIdAndStatusIn(slotId,
-                        List.of("PENDING", "CONFIRMED", "CHECKED_IN"))
+                .findBySlotIdAndStatusIn(slotId, List.of("PENDING", "CONFIRMED", "CHECKED_IN"))
                 .stream()
                 .anyMatch(res -> res.getActualOut() == null);
 
@@ -367,42 +403,6 @@ public class ReservationService {
                 syncSlotToFirebase(slot, false);
             });
         }
-    }
-
-    public Reservation checkOutByQrToken(String qrToken) {
-        Reservation r = reservationRepo.findByQrToken(qrToken)
-                .orElseThrow(() -> new IllegalArgumentException("Invalid QR code"));
-        assertHubAccess(r.getSlotId());
-        if (!"CHECKED_IN".equals(r.getStatus())) {
-            throw new IllegalStateException("Not in valid state for check-out: " + r.getStatus());
-        }
-
-        r.setActualOut(LocalDateTime.now());
-        r.setStatus("COMPLETED");
-
-        slotRepo.findById(r.getSlotId()).ifPresent(slot -> {
-            slot.setStatus(ParkingSlot.SlotStatus.AVAILABLE);
-            slotRepo.save(slot);
-            syncSlotToFirebase(slot, false);
-        });
-
-        openGate("exit-gate");
-
-        return reservationRepo.save(r);
-    }
-
-    public Reservation processQrScan(String qrToken) {
-        Reservation r = reservationRepo.findByQrToken(qrToken)
-                .orElseThrow(() -> new IllegalArgumentException("Invalid QR code"));
-        
-        return switch (r.getStatus()) {
-            case "CONFIRMED" -> checkInByQrToken(qrToken);
-            case "CHECKED_IN" -> checkOutByQrToken(qrToken);
-            case "COMPLETED", "PAID" -> throw new IllegalStateException("Already checked out.");
-            case "EXPIRED", "CANCELLED" ->
-                throw new IllegalStateException("Reservation is no longer valid: " + r.getStatus());
-            default -> throw new IllegalStateException("Unexpected status: " + r.getStatus());
-        };
     }
 
     public ParkingSlot setSlotStatusManually(Long slotId, ParkingSlot.SlotStatus status) {
@@ -417,10 +417,10 @@ public class ReservationService {
         return slot;
     }
 
-    private void openGate(String gateId) {
-        DatabaseReference gateRef = FirebaseDatabase.getInstance()
-                .getReference("gates/" + gateId + "/open");
-        gateRef.setValueAsync(true);
+    private void openGate(String door) {
+        DatabaseReference doorRef = FirebaseDatabase.getInstance()
+                .getReference("door/" + door);
+        doorRef.setValueAsync("open");
     }
 
     private void syncSlotToFirebase(ParkingSlot slot, boolean manualOverride) {
@@ -428,7 +428,7 @@ public class ReservationService {
                 .getReference("slots/" + slot.getSlotId());
 
         Map<String, Object> update = new HashMap<>();
-        update.put("status", slot.getStatus().name()); // e.g. AVAILABLE / RESERVED / OCCUPIED
+        update.put("status", slot.getStatus().name());
         update.put("manualOverride", manualOverride);
         update.put("updatedAt", Instant.now().toString());
 

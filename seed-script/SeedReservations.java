@@ -408,7 +408,7 @@ public class SeedReservations {
                 skipWs();
                 String key = parseString();
                 skipWs();
-                i++; // consume ':'
+                i++; 
                 Object value = parseValue();
                 map.put(key, value);
                 skipWs();

@@ -8,6 +8,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/reservations")
@@ -60,14 +61,12 @@ public class ReservationController {
         return ResponseEntity.ok("Deleted successfully");
     }
 
-    // Commuter pays online before arriving at the hub.
     @PutMapping("/{id}/confirm-payment")
     @PreAuthorize("@securityAccess.canAccessReservation(authentication, #id)")
     public ResponseEntity<?> confirmPayment(@PathVariable Long id) {
         return ResponseEntity.ok(reservationService.confirmPayment(id));
     }
 
-    // Staff marks a reservation paid at the gate (e.g. cash).
     @PutMapping("/{id}/paid")
     @PreAuthorize("hasAnyRole('ATTENDANT', 'ADMIN')")
     public ResponseEntity<?> markPaid(@PathVariable Long id) {
@@ -102,5 +101,23 @@ public class ReservationController {
     @PreAuthorize("hasAnyRole('ATTENDANT', 'ADMIN')")
     public ResponseEntity<?> gateBScan(@RequestParam String qrToken) {
         return ResponseEntity.ok(reservationService.checkOutByQrToken(qrToken));
+    }
+
+    @PutMapping("/gate/scan")
+    @PreAuthorize("hasAnyRole('ATTENDANT', 'ADMIN')")
+    public ResponseEntity<?> gateScan(@RequestParam String qrToken) {
+        try {
+            Reservation r = reservationService.processQrScan(qrToken);
+            String action = "COMPLETED".equals(r.getStatus()) ? "Checked out" : "Checked in";
+            return ResponseEntity.ok(Map.of(
+                    "ok", true,
+                    "message", action + " — slot #" + r.getSlotId(),
+                    "reservationId", r.getReservationId()));
+        } catch (IllegalStateException | IllegalArgumentException e) {
+            return ResponseEntity.ok(Map.of(
+                    "ok", false,
+                    "message", e.getMessage() != null ? e.getMessage() : "Scan rejected",
+                    "reservationId", (Object) null));
+        }
     }
 }

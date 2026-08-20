@@ -84,68 +84,61 @@ public class SecurityConfig {
                                                 .requestMatchers(HttpMethod.POST, "/api/payments/payhere/notify")
                                                 .permitAll()
                                                 .requestMatchers("/api/payments/**")
-                                                .hasAnyAuthority("ROLE_ADMIN", "ROLE_HUB_ADMIN", "ROLE_ATTENDANT")
+                                                .hasAnyRole("ADMIN", "HUB_ADMIN", "ATTENDANT")
 
-                                                // Slots (Public GETs)
+                                                // Subscription Public Packages vs Protected User Operations
+                                                .requestMatchers(HttpMethod.GET, "/api/subscriptions/packages",
+                                                                "/api/subscriptions/packages/**")
+                                                .permitAll()
+                                                .requestMatchers("/api/subscriptions/**")
+                                                .hasAnyRole("COMMUTER", "ADMIN", "HUB_ADMIN", "ATTENDANT")
+
+                                                // Slots Security
+                                                .requestMatchers(HttpMethod.GET, "/api/slots/recommendation")
+                                                .hasAnyRole("COMMUTER", "ADMIN", "HUB_ADMIN", "ATTENDANT")
                                                 .requestMatchers(HttpMethod.GET, "/api/slots", "/api/slots/**",
-                                                                "/api/slots/search",
-                                                                "/api/slots/search/**", "/api/v1/parking/",
-                                                                "/api/v1/parking/**")
+                                                                "/api/slots/search/**", "/api/v1/parking/**")
                                                 .permitAll()
                                                 .requestMatchers(HttpMethod.POST, "/api/slots/generate")
-                                                .hasAuthority("ROLE_ADMIN")
-                                                .requestMatchers(HttpMethod.POST, "/api/slots", "/api/slots/**")
-                                                .hasAnyAuthority("ROLE_ADMIN", "ROLE_HUB_ADMIN", "ROLE_ATTENDANT")
+                                                .hasRole("ADMIN")
+                                                .requestMatchers(HttpMethod.POST, "/api/slots/**")
+                                                .hasAnyRole("ADMIN", "HUB_ADMIN", "ATTENDANT")
                                                 .requestMatchers(HttpMethod.PUT, "/api/slots/**")
-                                                .hasAnyAuthority("ROLE_ADMIN", "ROLE_HUB_ADMIN", "ROLE_ATTENDANT")
+                                                .hasAnyRole("ADMIN", "HUB_ADMIN", "ATTENDANT")
                                                 .requestMatchers(HttpMethod.DELETE, "/api/slots/**")
-                                                .hasAnyAuthority("ROLE_ADMIN", "ROLE_HUB_ADMIN")
+                                                .hasAnyRole("ADMIN", "HUB_ADMIN")
 
                                                 // Reservations
                                                 .requestMatchers(HttpMethod.PUT, "/api/reservations/gate-*/scan")
-                                                .hasAnyAuthority("ROLE_ATTENDANT", "ROLE_HUB_ADMIN", "ROLE_ADMIN")
+                                                .hasAnyRole("ATTENDANT", "HUB_ADMIN", "ADMIN")
                                                 .requestMatchers(HttpMethod.PUT, "/api/reservations/checkin",
                                                                 "/api/reservations/*/checkin")
-                                                .hasAnyAuthority("ROLE_ATTENDANT", "ROLE_HUB_ADMIN", "ROLE_ADMIN")
+                                                .hasAnyRole("ATTENDANT", "HUB_ADMIN", "ADMIN")
                                                 .requestMatchers(HttpMethod.PUT, "/api/reservations/*/checkout")
-                                                .hasAnyAuthority("ROLE_ATTENDANT", "ROLE_HUB_ADMIN", "ROLE_ADMIN")
+                                                .hasAnyRole("ATTENDANT", "HUB_ADMIN", "ADMIN")
                                                 .requestMatchers(HttpMethod.PUT, "/api/reservations/*/paid")
-                                                .hasAnyAuthority("ROLE_ATTENDANT", "ROLE_HUB_ADMIN", "ROLE_ADMIN")
+                                                .hasAnyRole("ATTENDANT", "HUB_ADMIN", "ADMIN")
                                                 .requestMatchers(HttpMethod.DELETE, "/api/reservations/**")
-                                                .hasAuthority("ROLE_ADMIN")
+                                                .hasRole("ADMIN")
                                                 .requestMatchers("/api/reservations/**")
-                                                .hasAnyAuthority("ROLE_COMMUTER", "ROLE_ATTENDANT", "ROLE_HUB_ADMIN",
-                                                                "ROLE_ADMIN")
+                                                .hasAnyRole("COMMUTER", "ATTENDANT", "HUB_ADMIN", "ADMIN")
 
-                                                // Lots & Hubs (Public GETs)
-                                                .requestMatchers(HttpMethod.GET, "/api/hubs", "/api/hubs/**")
+                                                // Lots & Hubs
+                                                .requestMatchers(HttpMethod.GET, "/api/hubs/**", "/api/lots/**")
                                                 .permitAll()
-                                                .requestMatchers(HttpMethod.GET, "/api/lots", "/api/lots/**",
-                                                                "/api/lots/by-hub/**")
-                                                .permitAll()
-
-                                                .requestMatchers(HttpMethod.POST, "/api/hubs/**")
-                                                .hasAuthority("ROLE_ADMIN")
+                                                .requestMatchers(HttpMethod.POST, "/api/hubs/**").hasRole("ADMIN")
                                                 .requestMatchers(HttpMethod.PUT, "/api/hubs/**")
-                                                .hasAnyAuthority("ROLE_ADMIN", "ROLE_HUB_ADMIN")
-                                                .requestMatchers(HttpMethod.DELETE, "/api/hubs/**")
-                                                .hasAuthority("ROLE_ADMIN")
-
+                                                .hasAnyRole("ADMIN", "HUB_ADMIN")
+                                                .requestMatchers(HttpMethod.DELETE, "/api/hubs/**").hasRole("ADMIN")
                                                 .requestMatchers(HttpMethod.POST, "/api/lots/**")
-                                                .hasAnyAuthority("ROLE_ADMIN", "ROLE_HUB_ADMIN")
+                                                .hasAnyRole("ADMIN", "HUB_ADMIN")
                                                 .requestMatchers(HttpMethod.PUT, "/api/lots/**")
-                                                .hasAnyAuthority("ROLE_ADMIN", "ROLE_HUB_ADMIN")
+                                                .hasAnyRole("ADMIN", "HUB_ADMIN")
                                                 .requestMatchers(HttpMethod.DELETE, "/api/lots/**")
-                                                .hasAnyAuthority("ROLE_ADMIN", "ROLE_HUB_ADMIN")
+                                                .hasAnyRole("ADMIN", "HUB_ADMIN")
 
                                                 // Users & AI
-                                                .requestMatchers("/api/users/**", "/api/ai-insights")
-                                                .hasAuthority("ROLE_ADMIN")
-
-                                                // Subscriptions
-                                                .requestMatchers(HttpMethod.GET, "/api/subscriptions/**").permitAll()
-                                                .requestMatchers("/api/subscriptions/**")
-                                                .hasAnyAuthority("ROLE_COMMUTER", "ROLE_ADMIN")
+                                                .requestMatchers("/api/users/**", "/api/ai-insights").hasRole("ADMIN")
 
                                                 .anyRequest().authenticated())
                                 .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);

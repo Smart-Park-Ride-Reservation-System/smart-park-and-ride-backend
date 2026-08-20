@@ -49,27 +49,31 @@ public class JwtAuthFilter extends OncePerRequestFilter {
         try {
             if (jwtService.isTokenValid(token)) {
                 String email = jwtService.extractEmail(token);
-                String role = jwtService.extractRole(token);
+                String rawRole = jwtService.extractRole(token);
                 Long userId = jwtService.extractUserId(token);
                 Long hubId = jwtService.extractHubId(token);
 
-                // Format role to avoid double "ROLE_" prefix if already stored as "ROLE_ADMIN"
-                String formattedRole = role != null && role.startsWith("ROLE_") ? role.substring(5) : role;
+                // Ensure non-null clean role string
+                String cleanRole = (rawRole != null && !rawRole.isBlank()) ? rawRole.trim() : "COMMUTER";
+                
+                // Strip "ROLE_" prefix for store consistency in principal if needed
+                String normalizedRole = cleanRole.startsWith("ROLE_") ? cleanRole.substring(5) : cleanRole;
+                
+                // Standard authority string MUST retain "ROLE_" prefix for Spring Security hasRole()
+                String authorityName = cleanRole.startsWith("ROLE_") ? cleanRole : "ROLE_" + cleanRole;
 
-                AuthenticatedUser principal = new AuthenticatedUser(email, userId, hubId, formattedRole);
+                AuthenticatedUser principal = new AuthenticatedUser(email, userId, hubId, normalizedRole);
 
                 UsernamePasswordAuthenticationToken auth = new UsernamePasswordAuthenticationToken(
                         principal,
                         null,
-                        List.of(new SimpleGrantedAuthority("ROLE_" + formattedRole)));
+                        List.of(new SimpleGrantedAuthority(authorityName)));
 
                 SecurityContextHolder.getContext().setAuthentication(auth);
             }
         } catch (Exception e) {
-            // Log warning but DO NOT clear context or stop filter execution.
-            // Leaving the context empty allows Spring Security's HttpSecurity permitAll()
-            // rules to work.
             logger.warn("JWT validation failed: " + e.getMessage());
+            SecurityContextHolder.clearContext(); // Explicitly clear unauthenticated context on error
         }
 
         filterChain.doFilter(request, response);

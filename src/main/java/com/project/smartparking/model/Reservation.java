@@ -57,7 +57,6 @@ public class Reservation {
     @Column(name = "status", length = 30)
     private ReservationStatus status;
 
-    // Fixed: Changed Double to BigDecimal for financial precision
     @Column(name = "reservation_fee", precision = 10, scale = 2)
     private BigDecimal reservationFee;
 

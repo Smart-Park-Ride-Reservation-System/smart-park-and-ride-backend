@@ -33,9 +33,7 @@ public class PaymentService {
     }
 
     public List<Payment> getByReservation(Long reservationId) {
-        return paymentRepository.findByReservationReservationId(reservationId)
-                .map(List::of)
-                .orElse(List.of());
+        return paymentRepository.findByReservationReservationId(reservationId);
     }
 
     @Transactional
@@ -49,7 +47,8 @@ public class PaymentService {
         }
 
         Reservation reservation = reservationRepository.findById(payment.getReservation().getReservationId())
-                .orElseThrow(() -> new RuntimeException("Reservation not found: " + payment.getReservation().getReservationId()));
+                .orElseThrow(() -> new RuntimeException(
+                        "Reservation not found: " + payment.getReservation().getReservationId()));
         payment.setReservation(reservation);
 
         return paymentRepository.save(payment);
@@ -57,7 +56,8 @@ public class PaymentService {
 
     @Transactional
     public Payment updateStatus(Long id, String status) {
-        Payment.PaymentStatus enumStatus = parseEnum(Payment.PaymentStatus.class, status, "Invalid payment status: " + status);
+        Payment.PaymentStatus enumStatus = parseEnum(Payment.PaymentStatus.class, status,
+                "Invalid payment status: " + status);
 
         Payment payment = getById(id);
         payment.setPaymentStatus(enumStatus);
@@ -104,7 +104,10 @@ public class PaymentService {
                 .orElseThrow(() -> new RuntimeException("Reservation not found: " + reservationId));
 
         Payment duplicate = paymentRepository.findByReservationReservationId(reservationId)
-                .filter(p -> resolvedMethod == p.getPaymentMethod() && Payment.PaymentStatus.SUCCESS == p.getPaymentStatus())
+                .stream()
+                .filter(p -> resolvedMethod == p.getPaymentMethod()
+                        && Payment.PaymentStatus.SUCCESS == p.getPaymentStatus())
+                .findFirst()
                 .orElse(null);
 
         if (duplicate != null) {
@@ -124,12 +127,10 @@ public class PaymentService {
     public Map<String, BigDecimal> getRevenueSummary() {
         BigDecimal reservationFees = paymentRepository.sumAmountByStatusAndMethods(
                 Payment.PaymentStatus.SUCCESS,
-                List.of(Payment.PaymentMethod.CARD, Payment.PaymentMethod.PAYHERE)
-        );
+                List.of(Payment.PaymentMethod.CARD, Payment.PaymentMethod.PAYHERE));
         BigDecimal durationCharges = paymentRepository.sumAmountByStatusAndMethods(
                 Payment.PaymentStatus.SUCCESS,
-                List.of(Payment.PaymentMethod.CASH)
-        );
+                List.of(Payment.PaymentMethod.CASH));
 
         reservationFees = (reservationFees != null) ? reservationFees : BigDecimal.ZERO;
         durationCharges = (durationCharges != null) ? durationCharges : BigDecimal.ZERO;

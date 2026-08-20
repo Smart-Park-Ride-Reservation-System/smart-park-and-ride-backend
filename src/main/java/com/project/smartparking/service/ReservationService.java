@@ -334,6 +334,7 @@ public class ReservationService {
             paymentRepo.save(payment);
         }
 
+        r.setStatus(ReservationStatus.PAID); // <-- the fix
         return reservationRepo.save(r);
     }
 
@@ -476,5 +477,4 @@ public class ReservationService {
         slotRef.updateChildrenAsync(update);
     }
 
-    
 }

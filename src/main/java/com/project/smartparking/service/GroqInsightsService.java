@@ -27,34 +27,36 @@ public class GroqInsightsService {
     @Value("${groq.api.key}")
     private String groqApiKey;
 
-    private static final String GROQ_MODEL = "llama-3.1-8b-instant";
+    // Updated model identifier to active Groq model
+    private static final String GROQ_MODEL = "openai/gpt-oss-120b";
     private static final String GROQ_URL = "https://api.groq.com/openai/v1/chat/completions";
 
     private static final String RESPONSE_SCHEMA = """
-        {
-          "summary": string,
-          "insights": string[],
-          "anomalies": [
-            { "severity": "low" | "medium" | "high", "message": string }
-          ],
-          "forecast": {
-            "predictedBookings": number,
-            "predictedRevenue": number,
-            "trend": "up" | "down" | "flat",
-            "confidence": "low" | "medium" | "high",
-            "note": string
-          }
-        }
-        """;
+            {
+              "summary": string,
+              "insights": string[],
+              "anomalies": [
+                { "severity": "low" | "medium" | "high", "message": string }
+              ],
+              "forecast": {
+                "predictedBookings": number,
+                "predictedRevenue": number,
+                "trend": "up" | "down" | "flat",
+                "confidence": "low" | "medium" | "high",
+                "note": string
+              }
+            }
+            """;
 
     private final RestTemplate restTemplate;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     // Simple in-memory cache
     private static final long CACHE_TTL_MILLIS = 2 * 60 * 1000;
-    private final java.util.Map<String, CacheEntry> cache = new java.util.concurrent.ConcurrentHashMap<>();
+    private final Map<String, CacheEntry> cache = new java.util.concurrent.ConcurrentHashMap<>();
 
-    private record CacheEntry(AiInsightsResponse response, long timestamp) {}
+    private record CacheEntry(AiInsightsResponse response, long timestamp) {
+    }
 
     public GroqInsightsService(RestTemplate restTemplate) {
         this.restTemplate = restTemplate;
@@ -73,16 +75,14 @@ public class GroqInsightsService {
                 "model", GROQ_MODEL,
                 "messages", List.of(Map.of(
                         "role", "user",
-                        "content", prompt
-                )),
+                        "content", prompt)),
                 "temperature", 0.3,
-                "response_format", Map.of("type", "json_object")
-        );
+                "response_format", Map.of("type", "json_object"));
 
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
         headers.setBearerAuth(groqApiKey);
-        
+
         HttpEntity<Map<String, Object>> entity = new HttpEntity<>(body, headers);
 
         String url = GROQ_URL;
@@ -108,7 +108,7 @@ public class GroqInsightsService {
             } catch (HttpClientErrorException e) {
                 log.error("Groq API error — status: {}, body: {}", e.getStatusCode(), e.getResponseBodyAsString());
                 throw new AiInsightsException(
-                    "Groq error " + e.getStatusCode() + ": " + e.getResponseBodyAsString(), e);
+                        "Groq error " + e.getStatusCode() + ": " + e.getResponseBodyAsString(), e);
             } catch (RestClientException e) {
                 log.error("Groq API request failed", e);
                 throw new AiInsightsException("AI provider request failed: " + e.getMessage(), e);
@@ -147,29 +147,34 @@ public class GroqInsightsService {
         String dataJson = objectMapper.writeValueAsString(request);
 
         return """
-            You are a data analyst for a smart parking system. Analyze the aggregated
-            stats below for the "%s" period and respond with ONLY a single JSON object —
-            no markdown fences, no commentary, matching exactly this shape:
+                You are a data analyst for a smart parking system. Analyze the aggregated
+                stats below for the "%s" period and respond with ONLY a single JSON object —
+                no markdown fences, no commentary, matching exactly this shape:
 
-            %s
+                %s
 
-            Rules:
-            - Base every claim strictly on the numbers provided. Never invent figures.
-            - Insights should call out things a busy admin would want to know (growth/decline,
-              concentration in one status/vehicle type/slot, payment friction, sensor issues).
-            - Only include "anomalies" for genuinely unusual patterns (e.g. a spike/drop, a
-              slot or vehicle type dominating usage, an elevated failed/pending payment rate).
-            - The forecast should extrapolate from the current vs. previous period trend
-              in "growth". If previous-period data is missing or zero, say confidence is "low".
-            - Important: Please format your response as a valid JSON object matching the schema.
+                Rules:
+                - Base every claim strictly on the numbers provided. Never invent figures.
+                - Insights should call out things a busy admin would want to know (growth/decline,
+                  concentration in one status/vehicle type/slot, payment friction, sensor issues).
+                - Only include "anomalies" for genuinely unusual patterns (e.g. a spike/drop, a
+                  slot or vehicle type dominating usage, an elevated failed/pending payment rate).
+                - The forecast should extrapolate from the current vs. previous period trend
+                  in "growth". If previous-period data is missing or zero, say confidence is "low".
+                - Important: Please format your response as a valid JSON object matching the schema.
 
-            DATA:
-            %s
-            """.formatted(request.getDateRange(), RESPONSE_SCHEMA, dataJson);
+                DATA:
+                %s
+                """.formatted(request.getDateRange(), RESPONSE_SCHEMA, dataJson);
     }
 
     public static class AiInsightsException extends Exception {
-        public AiInsightsException(String message) { super(message); }
-        public AiInsightsException(String message, Throwable cause) { super(message, cause); }
+        public AiInsightsException(String message) {
+            super(message);
+        }
+
+        public AiInsightsException(String message, Throwable cause) {
+            super(message, cause);
+        }
     }
 }

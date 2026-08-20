@@ -3,19 +3,20 @@ package com.project.smartparking.service;
 import com.project.smartparking.dto.HubSummaryDto;
 import com.project.smartparking.model.Hub;
 import com.project.smartparking.model.ParkingLot;
-import com.project.smartparking.model.ParkingSlot;
 import com.project.smartparking.repository.HubRepository;
 import com.project.smartparking.repository.ParkingLotRepository;
 import com.project.smartparking.repository.ParkingSlotRepository;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
 
 @Service
+@Transactional(readOnly = true)
 public class HubService {
 
     @Autowired
@@ -27,7 +28,6 @@ public class HubService {
     @Autowired
     private ParkingSlotRepository parkingSlotRepository;
 
-    // ===================== ADMIN CRUD  =====================
 
     // GET ALL
     public List<Hub> getAllHubs() {
@@ -35,14 +35,16 @@ public class HubService {
     }
 
     // CREATE
+    @Transactional
     public Hub createHub(Hub hub) {
         if (hub.getName() == null || hub.getName().trim().isEmpty()) {
-            throw new RuntimeException("Hub name is required");
+            throw new IllegalArgumentException("Hub name is required");
         }
         return hubRepository.save(hub);
     }
 
     // UPDATE
+    @Transactional
     public Hub updateHub(Long id, Hub hub) {
         Hub existing = hubRepository.findById(id)
             .orElseThrow(() -> new RuntimeException("Hub not found: " + id));
@@ -58,6 +60,7 @@ public class HubService {
     }
 
     // DELETE
+    @Transactional
     public void deleteHub(Long id) {
         if (!hubRepository.existsById(id)) {
             throw new RuntimeException("Hub not found: " + id);
@@ -68,15 +71,15 @@ public class HubService {
     // ===================== PUBLIC HOME PAGE =====================
 
     public List<HubSummaryDto> getActiveHubSummaries() {
-        List<Hub> activeHubs = hubRepository.findByStatus("ACTIVE");
-        if (activeHubs.isEmpty()) {
-            return List.of();
-        }
-
-        return activeHubs.stream()
-                .map(this::toSummary)
-                .toList();
+    List<Hub> activeHubs = hubRepository.findByStatusIgnoreCase("ACTIVE");
+    if (activeHubs.isEmpty()) {
+        return List.of();
     }
+
+    return activeHubs.stream()
+            .map(this::toSummary)
+            .toList();
+}
 
     private HubSummaryDto toSummary(Hub hub) {
         List<ParkingLot> activeLots = parkingLotRepository.findByHub_HubId(hub.getHubId()).stream()
@@ -84,16 +87,16 @@ public class HubService {
                 .toList();
 
         int totalSlots = activeLots.stream()
-                .mapToInt(ParkingLot::getTotalSlots)
+                .mapToInt(lot -> lot.getTotalSlots() != null ? lot.getTotalSlots() : 0)
                 .sum();
 
         Set<Long> activeLotIds = activeLots.stream()
                 .map(ParkingLot::getLotId)
                 .collect(Collectors.toSet());
 
-   
+        // Fixed: Replaced slot.getLotId() with slot.getLot().getLotId()
         int availableSlots = (int) parkingSlotRepository.findAvailableByHub(hub.getHubId()).stream()
-                .filter(slot -> activeLotIds.contains(slot.getLotId()))
+                .filter(slot -> slot.getLot() != null && activeLotIds.contains(slot.getLot().getLotId()))
                 .count();
 
         return HubSummaryDto.builder()

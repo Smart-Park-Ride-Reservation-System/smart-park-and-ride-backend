@@ -70,7 +70,11 @@ public class SecurityAccessService {
         }
 
         Reservation reservation = reservationOpt.get();
-        Optional<User> ownerOpt = authRepository.findById(reservation.getUserId());
+        if (reservation.getUser() == null || reservation.getUser().getUserId() == null) {
+            return false;
+        }
+
+        Optional<User> ownerOpt = authRepository.findById(reservation.getUser().getUserId());
         return ownerOpt.isPresent() && ownerOpt.get().getEmail().equals(currentUserEmail);
     }
 }

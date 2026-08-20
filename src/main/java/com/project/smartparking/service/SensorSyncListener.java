@@ -4,6 +4,7 @@ import com.google.firebase.database.*;
 import com.project.smartparking.model.ParkingSlot;
 import com.project.smartparking.model.ParkingSlot.SlotStatus;
 import com.project.smartparking.model.Reservation;
+import com.project.smartparking.model.Reservation.ReservationStatus;
 import com.project.smartparking.repository.ParkingSlotRepository;
 import com.project.smartparking.repository.ReservationRepository;
 import jakarta.annotation.PostConstruct;
@@ -18,17 +19,21 @@ import java.util.List;
 import java.util.Map;
 
 @Service
-@DependsOn("firebaseConfig") 
+@DependsOn("firebaseConfig")
 public class SensorSyncListener {
 
     private static final Logger log = LoggerFactory.getLogger(SensorSyncListener.class);
-    private static final List<String> ACTIVE_RESERVATION_STATUSES = List.of("CONFIRMED", "CHECKED_IN");
+
+    // Updated to use ReservationStatus enums instead of String literals
+    private static final List<ReservationStatus> ACTIVE_RESERVATION_STATUSES = List.of(
+            ReservationStatus.CONFIRMED,
+            ReservationStatus.CHECKED_IN);
 
     private final ParkingSlotRepository slotRepo;
     private final ReservationRepository reservationRepo;
 
     public SensorSyncListener(ParkingSlotRepository slotRepo,
-                               ReservationRepository reservationRepo) {
+            ReservationRepository reservationRepo) {
         this.slotRepo = slotRepo;
         this.reservationRepo = reservationRepo;
     }
@@ -48,7 +53,6 @@ public class SensorSyncListener {
 
                         if (occupied != null && zone != null && slotNo != null) {
                             String slotCode = normalizeSlotCode(zone, slotNo);
-                            // Dynamic handling: Processes all sensors present in Firebase
                             updateSlotStatusInDb(slotCode, occupied);
                         }
                     }
@@ -75,7 +79,6 @@ public class SensorSyncListener {
 
     private void updateSlotStatusInDb(String slotCode, boolean occupied) {
         slotRepo.findBySlotCode(slotCode).ifPresentOrElse(slot -> {
-            // Do not override maintenance/out-of-service states
             if (slot.getStatus() == SlotStatus.OUT_OF_SERVICE) {
                 return;
             }
@@ -83,18 +86,17 @@ public class SensorSyncListener {
             SlotStatus newStatus;
 
             if (occupied) {
-                // Rule 1: Physical detection ALWAYS forces OCCUPIED (even without a reservation)
                 newStatus = SlotStatus.OCCUPIED;
             } else {
-                // Rule 2: Vehicle absent -> Check if slot should revert to RESERVED or AVAILABLE
+                // Compatible with the updated ReservationRepository signature:
+                // Collection<ReservationStatus>
                 List<Reservation> activeReservations = reservationRepo
-                        .findBySlotIdAndStatusIn(slot.getSlotId(), ACTIVE_RESERVATION_STATUSES);
-                
+                        .findBySlotSlotIdAndStatusIn(slot.getSlotId(), ACTIVE_RESERVATION_STATUSES);
+
                 boolean hasActiveReservation = !activeReservations.isEmpty();
                 newStatus = hasActiveReservation ? SlotStatus.RESERVED : SlotStatus.AVAILABLE;
             }
 
-            // Save and stream update if status changes
             if (slot.getStatus() != newStatus) {
                 slot.setStatus(newStatus);
                 slotRepo.save(slot);

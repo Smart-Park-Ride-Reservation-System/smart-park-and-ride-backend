@@ -146,7 +146,7 @@ public class SubscriptionService {
                     if (pkg == null || pkg.getDurationDays() == null || pkg.getDurationDays() <= 0) {
                         return BigDecimal.ZERO;
                     }
-                   
+
                     return pkg.getPrice()
                             .multiply(BigDecimal.valueOf(30))
                             .divide(BigDecimal.valueOf(pkg.getDurationDays()), 2, RoundingMode.HALF_UP);
@@ -160,7 +160,7 @@ public class SubscriptionService {
     }
 
     public List<UserSubscription> getAllSubscriptions() {
-        return userSubscriptionRepository.findAll();
+        return userSubscriptionRepository.findAllWithUserAndPackage();
     }
 
     public UserSubscription updateLocation(Long userId, LocationUpdateRequest request) {

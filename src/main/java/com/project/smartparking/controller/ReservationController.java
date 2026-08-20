@@ -1,5 +1,6 @@
 package com.project.smartparking.controller;
 
+import com.project.smartparking.dto.ReservationDto;
 import com.project.smartparking.model.ParkingSlot;
 import com.project.smartparking.model.Reservation;
 import com.project.smartparking.service.ReservationService;
@@ -21,7 +22,7 @@ public class ReservationController {
 
     @GetMapping
     @PreAuthorize("hasAnyRole('ATTENDANT', 'ADMIN')")
-    public List<Reservation> getAll() {
+    public List<ReservationDto> getAll() {
         return reservationService.getAll();
     }
 
@@ -38,8 +39,9 @@ public class ReservationController {
     }
 
     @PostMapping
-    @PreAuthorize("@securityAccess.isOwner(authentication, #r.userId)")
-    public ResponseEntity<?> create(@RequestBody Reservation r) {
+    @PreAuthorize("@securityAccess.isOwner(authentication, #r.user.userId)")
+    public ResponseEntity<?> create(
+            @RequestBody @org.springframework.security.core.parameters.P("r") Reservation r) {
         return ResponseEntity.ok(reservationService.create(r));
     }
 
@@ -79,7 +81,7 @@ public class ReservationController {
     @PutMapping("/slots/{slotId}/status")
     @PreAuthorize("hasAnyRole('ATTENDANT', 'ADMIN')")
     public ResponseEntity<ParkingSlot> setSlotStatusManually(
-            @PathVariable Long slotId, 
+            @PathVariable Long slotId,
             @RequestParam ParkingSlot.SlotStatus status) {
         return ResponseEntity.ok(reservationService.setSlotStatusManually(slotId, status));
     }
@@ -120,10 +122,13 @@ public class ReservationController {
     public ResponseEntity<?> gateScan(@RequestParam String qrToken) {
         try {
             Reservation r = reservationService.processQrScan(qrToken);
-            String action = "COMPLETED".equals(r.getStatus()) ? "Checked out" : "Checked in";
+            String action = "COMPLETED".equals(r.getStatus().name()) ? "Checked out" : "Checked in";
+
+            Long slotId = (r.getSlot() != null) ? r.getSlot().getSlotId() : null;
+
             return ResponseEntity.ok(Map.of(
                     "ok", true,
-                    "message", action + " — slot #" + r.getSlotId(),
+                    "message", action + " — slot #" + slotId,
                     "reservationId", r.getReservationId()));
         } catch (IllegalStateException | IllegalArgumentException e) {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of(

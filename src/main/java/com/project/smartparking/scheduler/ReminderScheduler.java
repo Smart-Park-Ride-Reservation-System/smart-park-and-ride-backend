@@ -7,6 +7,7 @@ import com.project.smartparking.service.NotificationService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -20,24 +21,49 @@ public class ReminderScheduler {
     @Autowired
     private NotificationService notificationService;
 
-    @Scheduled(fixedRate = 60000)
+    @Scheduled(fixedRate = 60000) // Runs every 60 seconds
+    @Transactional
     public void sendReminders() {
         LocalDateTime now = LocalDateTime.now();
-        LocalDateTime windowStart = now.plusMinutes(5);
-        LocalDateTime windowEnd = now.plusMinutes(6);
+        // Safe check window: Find any upcoming booking starting within the next 15 minutes 
+        // that hasn't received a reminder yet
+        LocalDateTime reminderThreshold = now.plusMinutes(15);
 
         List<Reservation> upcoming = reservationRepo
-                .findByScheduledInBetweenAndReminderSentFalse(windowStart, windowEnd);
+                .findByScheduledInLessThanEqualAndReminderSentFalse(reminderThreshold);
 
         for (Reservation r : upcoming) {
-            notificationService.notify(
-                    r.getUserId(),
-                    "Reservation reminder",
-                    "Your reservation starts in 5 minutes at " + r.getScheduledIn(),
-                    NotificationType.SYSTEM,
-                    true);
-            r.setReminderSent(true);
-            reservationRepo.save(r);
+            // Null check to prevent NullPointerException
+            if (r.getUser() == null || r.getUser().getUserId() == null) {
+                continue;
+            }
+
+            Long userId = r.getUser().getUserId();
+            String locationInfo = (r.getSlot() != null && r.getSlot().getLot() != null)
+                    ? r.getSlot().getLot().getLotCode() + " - " + r.getSlot().getSlotCode()
+                    : "assigned slot";
+
+            String message = String.format(
+                "Your reservation for slot (%s) starts soon at %s", 
+                locationInfo, 
+                r.getScheduledIn()
+            );
+
+            try {
+                notificationService.notify(
+                        userId,
+                        "Reservation Reminder",
+                        message,
+                        NotificationType.SYSTEM,
+                        true
+                );
+
+                r.setReminderSent(true);
+                reservationRepo.save(r);
+            } catch (Exception e) {
+                // Log error without breaking the loop for remaining users
+                System.err.println("Failed to send reminder for reservation ID: " + r.getReservationId() + " - " + e.getMessage());
+            }
         }
     }
 }

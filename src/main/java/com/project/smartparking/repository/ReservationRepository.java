@@ -1,47 +1,53 @@
 package com.project.smartparking.repository;
 
 import com.project.smartparking.model.Reservation;
+import com.project.smartparking.model.Reservation.ReservationStatus;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.time.LocalDateTime;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
 @Repository
 public interface ReservationRepository extends JpaRepository<Reservation, Long> {
 
-        List<Reservation> findByUserId(Long userId);
+    // Fix 1: Traverses Reservation -> user -> userId
+    List<Reservation> findByUser_UserId(Long userId);
 
-        List<Reservation> findBySlotId(Long slotId);
+    List<Reservation> findByScheduledInLessThanEqualAndReminderSentFalse(LocalDateTime threshold);
 
-        List<Reservation> findByStatus(String status);
-        List<Reservation> findByScheduledInBetweenAndReminderSentFalse(LocalDateTime start, LocalDateTime end);
+    Optional<Reservation> findByQrToken(String qrToken);
 
-        List<Reservation> findByStatusAndScheduledInBeforeAndActualInIsNull(
-                        String status,
-                        LocalDateTime time);
+    // Fix 2: Changed String status -> ReservationStatus status
+    List<Reservation> findByStatusAndScheduledInBeforeAndActualInIsNull(
+            ReservationStatus status,
+            LocalDateTime cutoffTime);
 
-        List<Reservation> findByStatusAndBookingDateBefore(String status, LocalDateTime cutoff);
+    // Fix 3: Changed String status -> ReservationStatus status
+    List<Reservation> findByStatusAndCreatedAtBefore(ReservationStatus status, LocalDateTime cutoff);
 
-        @Query("SELECT r FROM Reservation r WHERE r.slotId = :slotId AND r.status IN :statusList")
-        List<Reservation> findBySlotIdAndStatusIn(
-                        @Param("slotId") Long slotId,
-                        @Param("statusList") List<String> statusList);
+    List<Reservation> findByScheduledInBetweenAndReminderSentFalse(
+            LocalDateTime start,
+            LocalDateTime end);
 
-        @Query("SELECT CASE WHEN COUNT(r) > 0 THEN true ELSE false END " +
-                        "FROM Reservation r WHERE r.slotId = :slotId " +
-                        "AND r.scheduledIn = :scheduledIn AND r.status IN :statusList")
-        boolean existsBySlotIdAndScheduledInAndStatusIn(
-                        @Param("slotId") Long slotId,
-                        @Param("scheduledIn") LocalDateTime scheduledIn,
-                        @Param("statusList") List<String> statusList);
+    // Fix 4: Changed Collection<String> statuses -> Collection<ReservationStatus> statuses
+    List<Reservation> findBySlotSlotIdAndStatusIn(Long slotId, Collection<ReservationStatus> statuses);
 
-        Optional<Reservation> findByQrToken(String qrToken);
-
-        @Query("SELECT r FROM Reservation r WHERE UPPER(r.qrToken) LIKE CONCAT('%', :suffix)")
-        Optional<Reservation> findByQrTokenSuffix(@Param("suffix") String suffix);
-
+    @Query("""
+            SELECT DISTINCT r.slot.slotId FROM Reservation r
+            WHERE r.slot.lot.hub.hubId = :hubId
+              AND r.status IN (com.project.smartparking.model.Reservation.ReservationStatus.CONFIRMED, 
+                               com.project.smartparking.model.Reservation.ReservationStatus.PENDING, 
+                               com.project.smartparking.model.Reservation.ReservationStatus.CHECKED_IN)
+              AND r.scheduledIn < :endTime
+              AND COALESCE(r.actualOut, r.scheduledOut) > :startTime
+            """)
+    List<Long> findReservedSlotIdsInWindow(
+            @Param("hubId") Long hubId,
+            @Param("startTime") LocalDateTime startTime,
+            @Param("endTime") LocalDateTime endTime);
 }

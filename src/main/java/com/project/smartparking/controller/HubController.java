@@ -15,21 +15,25 @@ public class HubController {
     @Autowired
     private HubRepository repo;
 
-    // Open read access for all roles including commuters
-    @PreAuthorize("hasAnyRole('ADMIN', 'HUB_ADMIN', 'ATTENDANT', 'COMMUTER')")
     @GetMapping
     public List<Hub> getAll() {
         return repo.findAll();
     }
 
-    // CREATE HUB: Admin only
+    // Public read single hub
+    @GetMapping("/{id}")
+    public Hub getById(@PathVariable Long id) {
+        return repo.findById(id).orElseThrow();
+    }
+
+    // CREATE HUB: Admin and Hub Admin only
     @PreAuthorize("hasAnyRole('ADMIN', 'HUB_ADMIN')")
     @PostMapping
     public Hub create(@RequestBody Hub hub) {
         return repo.save(hub);
     }
 
-    // UPDATE HUB: Admin only
+    // UPDATE HUB: Admin and Hub Admin only
     @PreAuthorize("hasAnyRole('ADMIN', 'HUB_ADMIN')")
     @PutMapping("/{id}")
     public Hub update(@PathVariable Long id, @RequestBody Hub hub) {
@@ -44,7 +48,7 @@ public class HubController {
         return repo.save(existing);
     }
 
-    // DELETE HUB: Admin only
+    // DELETE HUB: Admin and Hub Admin only
     @PreAuthorize("hasAnyRole('ADMIN', 'HUB_ADMIN')")
     @DeleteMapping("/{id}")
     public void delete(@PathVariable Long id) {

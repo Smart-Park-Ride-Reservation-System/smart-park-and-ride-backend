@@ -19,16 +19,17 @@ public class ParkingSlot {
     @Column(name = "slot_code", nullable = false, length = 20)
     private String slotCode;
 
-    @Column(name = "lot_id", nullable = false)
-    private Long lotId;
+    // Foreign key connecting Slot to ParkingLot
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "lot_id", nullable = false)
+    private ParkingLot lot;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "status", columnDefinition = "ENUM('AVAILABLE', 'RESERVED', 'OCCUPIED', 'OUT_OF_SERVICE')")
     @Builder.Default
     private SlotStatus status = SlotStatus.AVAILABLE;
 
-    @OneToOne
-    @JoinColumn(name = "sensor_id", referencedColumnName = "sensor_id")
+    @OneToOne(mappedBy = "slot")
     private Sensor sensor;
 
     public enum SlotStatus {

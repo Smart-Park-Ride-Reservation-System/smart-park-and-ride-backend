@@ -2,12 +2,15 @@ package com.project.smartparking.model;
 
 import jakarta.persistence.*;
 import lombok.*;
+import java.util.List;
 
 @Entity
 @Table(name = "transport_hubs")
-@Data
+@Getter 
+@Setter
 @NoArgsConstructor
 @AllArgsConstructor
+@Builder
 public class Hub {
 
     @Id
@@ -32,4 +35,8 @@ public class Hub {
 
     @Column(name = "status", length = 30)
     private String status; 
+
+    // Connect Hub to its Parking Lots
+    @OneToMany(mappedBy = "hub", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<ParkingLot> lots;
 }

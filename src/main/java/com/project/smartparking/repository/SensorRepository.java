@@ -8,18 +8,38 @@ import org.springframework.data.repository.query.Param;
 
 import java.util.List;
 
-public interface SensorRepository extends JpaRepository<Sensor, Long> {
+public interface SensorRepository extends JpaRepository<Sensor, String> {
 
     @Query("SELECT new com.project.smartparking.dto.SensorDTO(" +
-           "s.sensorId, s.slotId, s.sensorType, s.macAddress, s.lastValue, " +
-           "s.status, s.createdAt, ps.slotCode, s.gpioPin, s.zoneCode) " +
-           "FROM Sensor s LEFT JOIN ParkingSlot ps ON s.slotId = ps.slotId")
+           "s.sensorId, " +
+           "s.slot.slotId, " +
+           "s.sensorType, " +
+           "s.macAddress, " +
+           "s.lastValue, " +
+           "s.status, " +
+           "s.createdAt, " +
+           "ps.slotCode, " +
+           "s.gpioPin, " +
+           "s.lot.lotId, " +
+           "s.lot.lotCode, " +
+           "s.lot.name) " +
+           "FROM Sensor s LEFT JOIN s.slot ps LEFT JOIN s.lot")
     List<SensorDTO> findAllWithSlotCode();
 
     @Query("SELECT new com.project.smartparking.dto.SensorDTO(" +
-           "s.sensorId, s.slotId, s.sensorType, s.macAddress, s.lastValue, " +
-           "s.status, s.createdAt, ps.slotCode, s.gpioPin, s.zoneCode) " +
-           "FROM Sensor s LEFT JOIN ParkingSlot ps ON s.slotId = ps.slotId " +
+           "s.sensorId, " +
+           "s.slot.slotId, " +
+           "s.sensorType, " +
+           "s.macAddress, " +
+           "s.lastValue, " +
+           "s.status, " +
+           "s.createdAt, " +
+           "ps.slotCode, " +
+           "s.gpioPin, " +
+           "s.lot.lotId, " +
+           "s.lot.lotCode, " +
+           "s.lot.name) " +
+           "FROM Sensor s LEFT JOIN s.slot ps LEFT JOIN s.lot " +
            "WHERE s.macAddress = :macAddress")
     List<SensorDTO> findByMacAddress(@Param("macAddress") String macAddress);
 }

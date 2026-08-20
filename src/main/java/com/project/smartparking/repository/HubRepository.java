@@ -10,4 +10,6 @@ import java.util.List;
 public interface HubRepository extends JpaRepository<Hub, Long> {
 
     List<Hub> findByStatus(String status);
+
+    List<Hub> findByStatusIgnoreCase(String status);
 }

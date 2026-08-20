@@ -6,9 +6,7 @@ import java.util.Map;
 
 public class AiInsightsDtos {
 
-    // ── Incoming request from the frontend ──
-    // currentPeriod / previousPeriod / growth arrive as loosely-typed maps since
-    // the frontend already aggregates the numbers; we just forward them into the prompt.
+ 
     public static class AiInsightsRequest {
         private String dateRange;
         private Map<String, Object> currentPeriod;

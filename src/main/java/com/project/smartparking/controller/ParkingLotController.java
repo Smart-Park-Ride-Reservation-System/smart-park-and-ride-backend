@@ -17,21 +17,19 @@ public class ParkingLotController {
     @Autowired
     private ParkingLotService parkingLotService;
 
-    // Open read access for all roles including commuters
-    @PreAuthorize("hasAnyRole('ADMIN', 'HUB_ADMIN', 'ATTENDANT', 'COMMUTER')")
+    // Public read access for everyone
     @GetMapping
     public ResponseEntity<List<ParkingLot>> getAll() {
         return ResponseEntity.ok(parkingLotService.getAllParkingLots());
     }
 
-    // Used by Next.js slot reservation screen
-    @PreAuthorize("hasAnyRole('ADMIN', 'HUB_ADMIN', 'ATTENDANT', 'COMMUTER')")
+    // Public read access used by Next.js slot reservation screen
     @GetMapping("/by-hub/{hubId}")
     public ResponseEntity<List<ParkingLot>> getByHub(@PathVariable Long hubId) {
         return ResponseEntity.ok(parkingLotService.getParkingLotsByHub(hubId));
     }
 
-    // CREATE LOT: Admin only
+    // CREATE LOT: Admin and Hub Admin only
     @PreAuthorize("hasAnyRole('ADMIN', 'HUB_ADMIN')")
     @PostMapping
     public ResponseEntity<ParkingLot> create(@RequestBody ParkingLot parkingLot) {
@@ -39,7 +37,7 @@ public class ParkingLotController {
                 .body(parkingLotService.createParkingLot(parkingLot));
     }
 
-    // UPDATE LOT: Admin only
+    // UPDATE LOT: Admin and Hub Admin only
     @PreAuthorize("hasAnyRole('ADMIN', 'HUB_ADMIN')")
     @PutMapping("/{id}")
     public ResponseEntity<ParkingLot> update(
@@ -48,7 +46,7 @@ public class ParkingLotController {
         return ResponseEntity.ok(parkingLotService.updateParkingLot(id, parkingLot));
     }
 
-    // DELETE LOT: Admin only
+    // DELETE LOT: Admin and Hub Admin only
     @PreAuthorize("hasAnyRole('ADMIN', 'HUB_ADMIN')")
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> delete(@PathVariable Long id) {

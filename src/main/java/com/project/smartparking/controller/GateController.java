@@ -17,8 +17,9 @@ public class GateController {
     public String checkin(@RequestParam("token") String token) {
         try {
             Reservation r = reservationService.checkInByQrToken(token);
+            Long slotId = (r.getSlot() != null) ? r.getSlot().getSlotId() : null;
             return renderResult(true, "Access Granted",
-                    "Slot #" + r.getSlotId() + " · Vehicle: " + r.getVehicleNo());
+                    "Slot #" + slotId + " · Vehicle: " + r.getVehicleNo());
         } catch (IllegalArgumentException e) {
             return renderResult(false, "Invalid QR Code", e.getMessage());
         } catch (IllegalStateException e) {

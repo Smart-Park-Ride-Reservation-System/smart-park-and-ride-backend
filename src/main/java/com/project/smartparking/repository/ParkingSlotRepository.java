@@ -31,6 +31,11 @@ public interface ParkingSlotRepository extends JpaRepository<ParkingSlot, Long> 
                    "WHERE l.hub_id = :hubId AND s.status = 'AVAILABLE'", nativeQuery = true)
     List<ParkingSlot> findAvailableByHub(@Param("hubId") Long hubId);
 
+    @Query(value = "SELECT COUNT(*) FROM parking_slots s " +
+                   "JOIN parking_lots l ON s.lot_id = l.lot_id " +
+                   "WHERE l.hub_id = :hubId AND s.status = 'AVAILABLE' AND l.status = 'ACTIVE'", nativeQuery = true)
+    int countAvailableByHub(@Param("hubId") Long hubId);
+
     Optional<ParkingSlot> findBySlotCode(String slotCode);
 
     @Query("SELECT s FROM ParkingSlot s " +

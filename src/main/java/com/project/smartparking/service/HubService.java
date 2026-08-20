@@ -95,9 +95,7 @@ public class HubService {
                 .collect(Collectors.toSet());
 
         // Fixed: Replaced slot.getLotId() with slot.getLot().getLotId()
-        int availableSlots = (int) parkingSlotRepository.findAvailableByHub(hub.getHubId()).stream()
-                .filter(slot -> slot.getLot() != null && activeLotIds.contains(slot.getLot().getLotId()))
-                .count();
+      int availableSlots = parkingSlotRepository.countAvailableByHub(hub.getHubId());
 
         return HubSummaryDto.builder()
                 .hubId(hub.getHubId())

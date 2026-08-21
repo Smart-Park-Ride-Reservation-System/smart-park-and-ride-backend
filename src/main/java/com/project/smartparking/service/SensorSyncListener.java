@@ -10,8 +10,10 @@ import com.project.smartparking.repository.ReservationRepository;
 import jakarta.annotation.PostConstruct;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.DependsOn;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 import java.util.HashMap;
@@ -31,6 +33,9 @@ public class SensorSyncListener {
     private final ParkingSlotRepository slotRepo;
     private final ReservationRepository reservationRepo;
 
+    @Autowired
+    private SlotStreamService slotStreamService;
+
     public SensorSyncListener(ParkingSlotRepository slotRepo,
             ReservationRepository reservationRepo) {
         this.slotRepo = slotRepo;
@@ -39,20 +44,44 @@ public class SensorSyncListener {
 
     @PostConstruct
     public void init() {
-        DatabaseReference parkingSensorsRef = FirebaseDatabase.getInstance().getReference("sensor/parking");
+        DatabaseReference hubsRef = FirebaseDatabase.getInstance().getReference("sensor/hubs");
 
-        parkingSensorsRef.addValueEventListener(new ValueEventListener() {
+        hubsRef.addValueEventListener(new ValueEventListener() {
             @Override
             public void onDataChange(DataSnapshot snapshot) {
-                for (DataSnapshot zoneSnap : snapshot.getChildren()) {
-                    String zone = zoneSnap.getKey(); // e.g., "A", "B"
-                    for (DataSnapshot slotSnap : zoneSnap.getChildren()) {
-                        String slotNo = slotSnap.getKey(); // raw sensor key
-                        Boolean occupied = slotSnap.child("occupied").getValue(Boolean.class);
+                for (DataSnapshot hubSnap : snapshot.getChildren()) {
+                    // Parse hubId from key e.g. "hub_1" → 1
+                    String hubKey = hubSnap.getKey();
+                    if (hubKey == null || !hubKey.startsWith("hub_")) continue;
+                    Long hubId;
+                    try {
+                        hubId = Long.parseLong(hubKey.substring(4));
+                    } catch (NumberFormatException e) {
+                        continue;
+                    }
 
-                        if (occupied != null && zone != null && slotNo != null) {
-                            String slotCode = normalizeSlotCode(zone, slotNo);
-                            updateSlotStatusInDb(slotCode, occupied);
+                    DataSnapshot lotsSnap = hubSnap.child("lots");
+                    if (lotsSnap.exists()) {
+                        for (DataSnapshot lotSnap : lotsSnap.getChildren()) {
+                            String lotKey = lotSnap.getKey(); // e.g. "lot_1"
+                            if (lotKey == null || !lotKey.startsWith("lot_")) continue;
+
+                            Long lotId;
+                            try {
+                                lotId = Long.parseLong(lotKey.substring(4));
+                            } catch (NumberFormatException e) {
+                                continue;
+                            }
+
+                            for (DataSnapshot slotSnap : lotSnap.getChildren()) {
+                                String slotCode = slotSnap.getKey();
+                                Boolean occupied = slotSnap.child("occupied").getValue(Boolean.class);
+
+                                if (occupied != null && slotCode != null) {
+                                    // Pass hubId explicitly — avoids lazy-loading hub from slot entity
+                                    updateSlotStatusInDb(hubId, lotId, slotCode, occupied);
+                                }
+                            }
                         }
                     }
                 }
@@ -64,20 +93,15 @@ public class SensorSyncListener {
             }
         });
 
-        log.info("[SensorSync] listening on /sensor/parking for dynamic sensor updates");
+        log.info("[SensorSync] listening on /sensor/hubs for dynamic sensor updates");
     }
 
-    private String normalizeSlotCode(String zone, String slotNo) {
-        try {
-            int n = Integer.parseInt(slotNo);
-            return zone + String.format("%02d", n);
-        } catch (NumberFormatException e) {
-            return zone + slotNo;
-        }
-    }
-
-    private void updateSlotStatusInDb(String slotCode, boolean occupied) {
-        slotRepo.findBySlotCode(slotCode).ifPresentOrElse(slot -> {
+    // NOTE: @Transactional is intentionally NOT used here.
+    // This method is called from a Firebase callback (inner class), which bypasses
+    // the Spring proxy — making @Transactional silently ineffective.
+    // Spring Data repository methods (find/save) each manage their own short transactions.
+    public void updateSlotStatusInDb(Long hubId, Long lotId, String slotCode, boolean occupied) {
+        slotRepo.findByLot_LotIdAndSlotCode(lotId, slotCode).ifPresentOrElse(slot -> {
             if (slot.getStatus() == SlotStatus.OUT_OF_SERVICE) {
                 return;
             }
@@ -87,7 +111,6 @@ public class SensorSyncListener {
             if (occupied) {
                 newStatus = SlotStatus.OCCUPIED;
             } else {
-
                 List<Reservation> activeReservations = reservationRepo
                         .findBySlotSlotIdAndStatusIn(slot.getSlotId(), ACTIVE_RESERVATION_STATUSES);
 
@@ -98,10 +121,15 @@ public class SensorSyncListener {
             if (slot.getStatus() != newStatus) {
                 slot.setStatus(newStatus);
                 slotRepo.save(slot);
-                pushToFirebase(slot);
-                log.info("Live Update: Slot {} is now {}", slotCode, newStatus);
+                log.info("Live Update: Slot {} (lot={}, hub={}) is now {}", slotCode, lotId, hubId, newStatus);
             }
-        }, () -> log.debug("Unregistered slot sensor payload received for slotCode={}", slotCode));
+
+            // Use hubId + lotId directly (already parsed from Firebase path) to
+            // avoid lazy-loading slot.getLot().getHub() on a detached entity
+            slotStreamService.notifyLotChange(hubId, lotId);
+            pushToFirebase(slot);
+
+        }, () -> log.warn("[SensorSync] No DB slot for hubId={} lotId={} slotCode={}", hubId, lotId, slotCode));
     }
 
     private void pushToFirebase(ParkingSlot slot) {

@@ -26,9 +26,17 @@ public class ReservationController {
     private ReservationService reservationService;
 
     @GetMapping
-    @PreAuthorize("hasAnyRole('ATTENDANT', 'ADMIN')")
-    public List<ReservationDto> getAll() {
-        return reservationService.getAll();
+    @PreAuthorize("hasAnyRole('ATTENDANT', 'HUB_ADMIN', 'ADMIN')")
+    public ResponseEntity<?> getAll(Authentication authentication) {
+        AuthenticatedUser principal = (AuthenticatedUser) authentication.getPrincipal();
+        // HUB_ADMIN only sees reservations for their assigned hub
+        if (principal.role() != null && principal.role().equals("HUB_ADMIN")) {
+            if (principal.hubId() == null) {
+                return ResponseEntity.status(403).body("Hub admin has no assigned hub");
+            }
+            return ResponseEntity.ok(reservationService.getByHub(principal.hubId()));
+        }
+        return ResponseEntity.ok(reservationService.getAll());
     }
 
     @GetMapping("/{id}")
@@ -77,14 +85,14 @@ public class ReservationController {
     }
 
     @PutMapping("/{id}/paid")
-    @PreAuthorize("hasAnyRole('ATTENDANT', 'ADMIN')")
+    @PreAuthorize("hasAnyRole('ATTENDANT', 'HUB_ADMIN', 'ADMIN')")
     public ResponseEntity<?> markPaid(@PathVariable Long id) {
         return ResponseEntity.ok(reservationService.markPaid(id));
     }
 
     // --- MANUAL OVERRIDE ENDPOINT ---
     @PutMapping("/slots/{slotId}/status")
-    @PreAuthorize("hasAnyRole('ATTENDANT', 'ADMIN')")
+    @PreAuthorize("hasAnyRole('ATTENDANT', 'HUB_ADMIN', 'ADMIN')")
     public ResponseEntity<ParkingSlot> setSlotStatusManually(
             @PathVariable Long slotId,
             @RequestParam ParkingSlot.SlotStatus status) {
@@ -93,25 +101,25 @@ public class ReservationController {
 
     // --- QR CHECK-IN / CHECK-OUT ENDPOINTS ---
     @PutMapping("/checkin")
-    @PreAuthorize("hasAnyRole('ATTENDANT', 'ADMIN')")
+    @PreAuthorize("hasAnyRole('ATTENDANT', 'HUB_ADMIN', 'ADMIN')")
     public ResponseEntity<?> checkInByCode(@RequestParam String code) {
         return ResponseEntity.ok(reservationService.checkInByQrToken(code));
     }
 
     @PutMapping("/{id}/checkin")
-    @PreAuthorize("hasAnyRole('ATTENDANT', 'ADMIN')")
+    @PreAuthorize("hasAnyRole('ATTENDANT', 'HUB_ADMIN', 'ADMIN')")
     public ResponseEntity<?> checkInById(@PathVariable Long id) {
         return ResponseEntity.ok(reservationService.checkInById(id));
     }
 
     @PutMapping("/{id}/checkout")
-    @PreAuthorize("hasAnyRole('ATTENDANT', 'ADMIN')")
+    @PreAuthorize("hasAnyRole('ATTENDANT', 'HUB_ADMIN', 'ADMIN')")
     public ResponseEntity<?> checkOut(@PathVariable Long id) {
         return ResponseEntity.ok(reservationService.checkOut(id));
     }
 
     @PostMapping("/walk-in")
-    @PreAuthorize("hasAnyRole('ATTENDANT', 'ADMIN')")
+    @PreAuthorize("hasAnyRole('ATTENDANT', 'HUB_ADMIN', 'ADMIN')")
     public ResponseEntity<?> walkIn(@RequestBody WalkInRequest request) {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
         AuthenticatedUser current = (AuthenticatedUser) auth.getPrincipal();
@@ -130,7 +138,7 @@ public class ReservationController {
     }
 
     @GetMapping("/active")
-    @PreAuthorize("hasAnyRole('ATTENDANT', 'ADMIN')")
+    @PreAuthorize("hasAnyRole('ATTENDANT', 'HUB_ADMIN', 'ADMIN')")
     public ResponseEntity<?> getActive(@RequestParam Long hubId, @RequestParam Long lotId) {
         return ResponseEntity.ok(reservationService.getActiveReservationsForLot(hubId, lotId));
     }
@@ -165,6 +173,21 @@ public class ReservationController {
                     "ok", false,
                     "message", e.getMessage() != null ? e.getMessage() : "Scan rejected",
                     "reservationId", null));
+        }
+    }
+
+    @PostMapping("/gate/open")
+    @PreAuthorize("hasAnyRole('ATTENDANT', 'HUB_ADMIN', 'ADMIN')")
+    public ResponseEntity<?> openGateManually(
+            @RequestParam Long hubId,
+            @RequestParam Long lotId,
+            @RequestParam String door) {
+        try {
+            reservationService.openGateManually(hubId, lotId, door);
+            return ResponseEntity.ok(Map.of("ok", true, "message", "Gate " + door + " opened manually"));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(Map.of("ok", false, "message", e.getMessage()));
         }
     }
 }

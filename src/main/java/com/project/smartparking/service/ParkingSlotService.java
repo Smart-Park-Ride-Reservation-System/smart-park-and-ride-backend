@@ -177,15 +177,18 @@ public class ParkingSlotService {
     }
 
     public List<ParkingSlot> findByLot(Long hubId, Long lotId) {
-        return findByLot(hubId, lotId, LocalDateTime.now(), LocalDateTime.now().plusHours(2));
+        java.time.ZoneId SRI_LANKA_ZONE = java.time.ZoneId.of("Asia/Colombo");
+        LocalDateTime now = java.time.ZonedDateTime.now(SRI_LANKA_ZONE).toLocalDateTime();
+        return findByLot(hubId, lotId, now, now.plusHours(2));
     }
 
     public List<ParkingSlot> findByLot(Long hubId, Long lotId, LocalDateTime startTime, LocalDateTime endTime) {
         List<ParkingSlot> slots = slotRepo.findByLot_LotId(lotId);
 
-        LocalDateTime now = LocalDateTime.now();
+        java.time.ZoneId SRI_LANKA_ZONE = java.time.ZoneId.of("Asia/Colombo");
+        LocalDateTime now = java.time.ZonedDateTime.now(SRI_LANKA_ZONE).toLocalDateTime();
         List<Long> reservedSlotIds = reservationRepo.findReservedSlotIdsInWindow(
-                hubId, startTime, endTime, now.minusMinutes(10), now.minusMinutes(15));
+                hubId, startTime, endTime, now.minusMinutes(2), now.minusMinutes(15));
 
         for (ParkingSlot slot : slots) {
             if (slot.getStatus() == ParkingSlot.SlotStatus.OUT_OF_SERVICE) {

@@ -42,7 +42,8 @@ public class ParkingSlotController {
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime startTime,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime endTime) {
 
-        LocalDateTime start = (startTime != null) ? startTime : LocalDateTime.now();
+        java.time.ZoneId SRI_LANKA_ZONE = java.time.ZoneId.of("Asia/Colombo");
+        LocalDateTime start = (startTime != null) ? startTime : LocalDateTime.now(SRI_LANKA_ZONE);
         LocalDateTime end = (endTime != null) ? endTime : start.plusHours(2);
 
         if (end.isBefore(start)) {

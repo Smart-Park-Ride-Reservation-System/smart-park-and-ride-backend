@@ -32,6 +32,10 @@ public interface ReservationRepository extends JpaRepository<Reservation, Long> 
 
       List<Reservation> findBySlotSlotIdAndStatusIn(Long slotId, Collection<Reservation.ReservationStatus> statuses);
 
+      // Hub-scoped: all reservations belonging to slots in a given hub
+      @Query("SELECT r FROM Reservation r WHERE r.slot.lot.hub.hubId = :hubId ORDER BY r.createdAt DESC")
+      List<Reservation> findByHubId(@Param("hubId") Long hubId);
+
       @Query("""
                       SELECT DISTINCT r.slot.slotId
                   FROM Reservation r

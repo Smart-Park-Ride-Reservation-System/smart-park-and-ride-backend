@@ -1,8 +1,10 @@
 package com.project.smartparking.controller;
 
+import com.project.smartparking.Config.AuthenticatedUser;
 import com.project.smartparking.dto.NotificationSendRequest;
 import com.project.smartparking.model.NotificationBroadcast;
 import com.project.smartparking.model.User;
+import com.project.smartparking.repository.UserRepository;
 import com.project.smartparking.service.NotificationBroadcastService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -22,15 +24,18 @@ public class NotificationBroadcastController {
     @Autowired
     private NotificationBroadcastService broadcastService;
 
+    @Autowired
+    private UserRepository userRepository;
+
     @GetMapping
     public ResponseEntity<?> getAll(Authentication authentication) {
         try {
-            User principal = (User) authentication.getPrincipal();
-            if (principal.getRole() == User.Role.HUB_ADMIN) {
-                if (principal.getHub() == null) {
+            AuthenticatedUser principal = (AuthenticatedUser) authentication.getPrincipal();
+            if ("HUB_ADMIN".equals(principal.role())) {
+                if (principal.hubId() == null) {
                     return ResponseEntity.status(403).body("Hub admin has no assigned hub");
                 }
-                return ResponseEntity.ok(broadcastService.getAllByHub(principal.getHub().getHubId()));
+                return ResponseEntity.ok(broadcastService.getAllByHub(principal.hubId()));
             }
             return ResponseEntity.ok(broadcastService.getAll());
         } catch (Exception e) {
@@ -43,7 +48,7 @@ public class NotificationBroadcastController {
     @PostMapping("/send")
     public ResponseEntity<?> send(@RequestBody NotificationSendRequest req, Authentication authentication) {
         try {
-            User caller = (User) authentication.getPrincipal();
+            User caller = resolveUser(authentication);
             NotificationBroadcast result = broadcastService.send(req, caller);
             return ResponseEntity.ok(result);
         } catch (org.springframework.security.access.AccessDeniedException e) {
@@ -58,7 +63,7 @@ public class NotificationBroadcastController {
     @PostMapping("/{id}/resend")
     public ResponseEntity<?> resend(@PathVariable Long id, Authentication authentication) {
         try {
-            User caller = (User) authentication.getPrincipal();
+            User caller = resolveUser(authentication);
             if (!canAccessBroadcast(id, caller)) {
                 return ResponseEntity.status(403).body("Not your hub's broadcast");
             }
@@ -73,7 +78,7 @@ public class NotificationBroadcastController {
     @DeleteMapping("/{id}")
     public ResponseEntity<?> delete(@PathVariable Long id, Authentication authentication) {
         try {
-            User caller = (User) authentication.getPrincipal();
+            User caller = resolveUser(authentication);
             if (!canAccessBroadcast(id, caller)) {
                 return ResponseEntity.status(403).body("Not your hub's broadcast");
             }
@@ -84,6 +89,19 @@ public class NotificationBroadcastController {
             return ResponseEntity.internalServerError()
                     .body("Delete failed: " + e.getMessage());
         }
+    }
+
+    // ── helpers ────────────────────────────────────────────────────────────────
+
+    /**
+     * Load the full User entity from DB using the JWT AuthenticatedUser.
+     * NotificationBroadcastService methods require a User entity (not AuthenticatedUser record)
+     * because they inspect hub assignment and role directly on the model.
+     */
+    private User resolveUser(Authentication authentication) {
+        AuthenticatedUser principal = (AuthenticatedUser) authentication.getPrincipal();
+        return userRepository.findById(principal.userId())
+                .orElseThrow(() -> new RuntimeException("Authenticated user not found in DB: " + principal.userId()));
     }
 
     private boolean canAccessBroadcast(Long id, User caller) {

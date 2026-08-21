@@ -37,6 +37,7 @@ public interface ParkingSlotRepository extends JpaRepository<ParkingSlot, Long> 
     int countAvailableByHub(@Param("hubId") Long hubId);
 
     Optional<ParkingSlot> findBySlotCode(String slotCode);
+    Optional<ParkingSlot> findByLot_LotIdAndSlotCode(Long lotId, String slotCode);
 
     @Query("SELECT s FROM ParkingSlot s " +
            "JOIN FETCH s.lot l " +

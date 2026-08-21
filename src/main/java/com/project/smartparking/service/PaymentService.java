@@ -27,6 +27,10 @@ public class PaymentService {
         return paymentRepository.findAll();
     }
 
+    public List<Payment> getByHub(Long hubId) {
+        return paymentRepository.findByHubId(hubId);
+    }
+
     public Payment getById(Long id) {
         return paymentRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Payment not found: " + id));
@@ -131,6 +135,26 @@ public class PaymentService {
         BigDecimal durationCharges = paymentRepository.sumAmountByStatusAndMethods(
                 Payment.PaymentStatus.SUCCESS,
                 List.of(Payment.PaymentMethod.CASH));
+
+        reservationFees = (reservationFees != null) ? reservationFees : BigDecimal.ZERO;
+        durationCharges = (durationCharges != null) ? durationCharges : BigDecimal.ZERO;
+
+        Map<String, BigDecimal> summary = new HashMap<>();
+        summary.put("reservationFees", reservationFees);
+        summary.put("durationCharges", durationCharges);
+        summary.put("total", reservationFees.add(durationCharges));
+        return summary;
+    }
+
+    public Map<String, BigDecimal> getRevenueSummaryByHub(Long hubId) {
+        BigDecimal reservationFees = paymentRepository.sumAmountByStatusAndMethodsAndHub(
+                Payment.PaymentStatus.SUCCESS,
+                List.of(Payment.PaymentMethod.CARD, Payment.PaymentMethod.PAYHERE),
+                hubId);
+        BigDecimal durationCharges = paymentRepository.sumAmountByStatusAndMethodsAndHub(
+                Payment.PaymentStatus.SUCCESS,
+                List.of(Payment.PaymentMethod.CASH),
+                hubId);
 
         reservationFees = (reservationFees != null) ? reservationFees : BigDecimal.ZERO;
         durationCharges = (durationCharges != null) ? durationCharges : BigDecimal.ZERO;

@@ -17,14 +17,12 @@ import com.project.smartparking.repository.PaymentRepository;
 import com.project.smartparking.repository.ReservationRepository;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.ResponseEntity;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
 
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -69,6 +67,11 @@ public class ReservationService {
     @Transactional(readOnly = true)
     public List<ReservationDto> getAll() {
         return reservationRepo.findAll().stream().map(ReservationDto::from).toList();
+    }
+
+    @Transactional(readOnly = true)
+    public List<ReservationDto> getByHub(Long hubId) {
+        return reservationRepo.findByHubId(hubId).stream().map(ReservationDto::from).toList();
     }
 
     public Reservation getById(Long id) {
@@ -155,7 +158,7 @@ public class ReservationService {
         slotStreamService.notifySlotUpdate(slot);
         syncSlotToFirebase(slot, false);
 
-        openGate("in");
+        openGate(saved, "in");
 
         return saved;
     }
@@ -177,9 +180,9 @@ public class ReservationService {
 
         LocalDateTime slNow = getSriLankaNow();
 
-        // FIX 1: Set 2-minute soft-lock threshold for PENDING checkout entries to
+        // FIX 1: Set 5-minute soft-lock threshold for PENDING checkout entries to
         // prevent simultaneous bookings
-        LocalDateTime pendingCutoff = slNow.minusMinutes(2);
+        LocalDateTime pendingCutoff = slNow.minusMinutes(5);
 
         // 15-minute no-show cutoff window
         LocalDateTime noShowCutoff = slNow.minusMinutes(15);
@@ -252,13 +255,16 @@ public class ReservationService {
     @Transactional
     public void delete(Long id) {
         Reservation r = getById(id);
-
-        if (List.of(ReservationStatus.PENDING, ReservationStatus.CONFIRMED, ReservationStatus.CHECKED_IN)
-                .contains(r.getStatus())) {
-            freeSlotIfNoActiveReservation(r.getSlot().getSlotId());
-        }
+        
+        Long slotId = r.getSlot().getSlotId();
+        boolean wasActive = List.of(ReservationStatus.PENDING, ReservationStatus.CONFIRMED, ReservationStatus.CHECKED_IN)
+                .contains(r.getStatus());
 
         reservationRepo.deleteById(id);
+
+        if (wasActive) {
+            freeSlotIfNoActiveReservation(slotId);
+        }
     }
 
     @Transactional
@@ -267,9 +273,9 @@ public class ReservationService {
 
         // Explicitly expire stale PENDING reservations upon payment attempt
         if (r.getStatus() == ReservationStatus.PENDING
-                && r.getCreatedAt().isBefore(getSriLankaNow().minusMinutes(2))) {
+                && r.getCreatedAt().isBefore(getSriLankaNow().minusMinutes(5))) {
             expire(r);
-            throw new IllegalStateException("Your 2-minute hold window has expired. Please select a slot again.");
+            throw new IllegalStateException("Your 5-minute hold window has expired. Please select a slot again.");
         }
 
         if (List.of(ReservationStatus.CONFIRMED, ReservationStatus.CHECKED_IN, ReservationStatus.COMPLETED)
@@ -327,7 +333,7 @@ public class ReservationService {
             syncSlotToFirebase(slot, false);
         });
 
-        openGate("in");
+        openGate(r, "in");
 
         return reservationRepo.save(r);
     }
@@ -351,7 +357,7 @@ public class ReservationService {
             syncSlotToFirebase(slot, false);
         });
 
-        openGate("out");
+        openGate(r, "out");
 
         return reservationRepo.save(r);
     }
@@ -374,7 +380,7 @@ public class ReservationService {
             syncSlotToFirebase(slot, false);
         });
 
-        openGate("in");
+        openGate(r, "in");
 
         return reservationRepo.save(r);
     }
@@ -397,7 +403,7 @@ public class ReservationService {
             syncSlotToFirebase(slot, false);
         });
 
-        openGate("out");
+        openGate(r, "out");
 
         return reservationRepo.save(r);
     }
@@ -511,7 +517,7 @@ public class ReservationService {
         LocalDateTime slNow = getSriLankaNow();
 
         reservationRepo
-                .findByStatusAndCreatedAtBefore(ReservationStatus.PENDING, slNow.minusMinutes(2))
+                .findByStatusAndCreatedAtBefore(ReservationStatus.PENDING, slNow.minusMinutes(5))
                 .forEach(this::expire);
 
         LocalDateTime arrivalGraceThreshold = slNow.minusMinutes(15);
@@ -571,10 +577,32 @@ public class ReservationService {
         return slot;
     }
 
-    private void openGate(String door) {
-        DatabaseReference doorRef = FirebaseDatabase.getInstance()
-                .getReference("door/" + door);
+    private void openGate(Reservation r, String door) {
+        Long hubId = r.getSlot().getLot().getHub().getHubId();
+        Long lotId = r.getSlot().getLot().getLotId();
+        String gatePath = "door/hubs/hub_" + hubId + "/lots/lot_" + lotId + "/" + door;
+        
+        DatabaseReference doorRef = FirebaseDatabase.getInstance().getReference(gatePath);
         doorRef.setValueAsync("open");
+    }
+
+    public void openGateManually(Long hubId, Long lotId, String door) {
+        // Enforce hub admin boundaries
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth != null && auth.getPrincipal() instanceof AuthenticatedUser current) {
+            if ("HUB_ADMIN".equals(current.role()) && !hubId.equals(current.hubId())) {
+                throw new AccessDeniedException("You can only open gates for your assigned hub.");
+            }
+        }
+        
+        if (!"in".equals(door) && !"out".equals(door)) {
+            throw new IllegalArgumentException("Door must be 'in' or 'out'");
+        }
+
+        String gatePath = "door/hubs/hub_" + hubId + "/lots/lot_" + lotId + "/" + door;
+        DatabaseReference doorRef = FirebaseDatabase.getInstance().getReference(gatePath);
+        doorRef.setValueAsync("open");
+        log.info("Manual gate open requested: hub={}, lot={}, door={}", hubId, lotId, door);
     }
 
     private void syncSlotToFirebase(ParkingSlot slot, boolean manualOverride) {

@@ -49,11 +49,15 @@ public class JwtService {
     }
 
     public Long extractHubId(String token) {
-        return getClaims(token).get("hubId", Long.class);
+        Object hubIdObj = getClaims(token).get("hubId");
+        if (hubIdObj == null) return null;
+        return ((Number) hubIdObj).longValue();
     }
 
     public Long extractUserId(String token) {
-        return getClaims(token).get("userId", Long.class);
+        Object userIdObj = getClaims(token).get("userId");
+        if (userIdObj == null) return null;
+        return ((Number) userIdObj).longValue();
     }
 
     public boolean isTokenValid(String token) {

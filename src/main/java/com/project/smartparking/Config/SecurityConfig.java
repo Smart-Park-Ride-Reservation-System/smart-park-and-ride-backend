@@ -96,9 +96,14 @@ public class SecurityConfig {
                                                 // Slots Security
                                                 .requestMatchers(HttpMethod.GET, "/api/slots/recommendation")
                                                 .hasAnyRole("COMMUTER", "ADMIN", "HUB_ADMIN", "ATTENDANT")
-                                                .requestMatchers(HttpMethod.GET, "/api/slots", "/api/slots/**",
-                                                                "/api/slots/search/**", "/api/v1/parking/**")
+                                                .requestMatchers(HttpMethod.GET, "/api/slots/search/**", "/api/v1/parking/**")
                                                 .permitAll()
+                                                // Allow anyone to subscribe to the real-time SSE slot stream (EventSource doesn't support auth headers)
+                                                .requestMatchers(HttpMethod.GET, "/api/slots/stream")
+                                                .permitAll()
+                                                // All other slot management endpoints are admin-only
+                                                .requestMatchers(HttpMethod.GET, "/api/slots", "/api/slots/**")
+                                                .hasAnyRole("ADMIN", "HUB_ADMIN", "ATTENDANT")
                                                 .requestMatchers(HttpMethod.POST, "/api/slots/generate")
                                                 .hasRole("ADMIN")
                                                 .requestMatchers(HttpMethod.POST, "/api/slots/**")
@@ -120,7 +125,8 @@ public class SecurityConfig {
                                                 .hasAnyRole("ATTENDANT", "HUB_ADMIN", "ADMIN")
                                                 .requestMatchers(HttpMethod.DELETE, "/api/reservations/**")
                                                 .hasRole("ADMIN")
-                                                .requestMatchers("/api/reservations/**")
+                                                // Fix: /api/reservations without trailing slash was not matched by /api/reservations/**
+                                                .requestMatchers("/api/reservations", "/api/reservations/**")
                                                 .hasAnyRole("COMMUTER", "ATTENDANT", "HUB_ADMIN", "ADMIN")
 
                                                 // Lots & Hubs
@@ -143,6 +149,20 @@ public class SecurityConfig {
                                                 .requestMatchers(HttpMethod.GET, "/api/users/**")
                                                 .hasAnyRole("ADMIN", "HUB_ADMIN")
                                                 .requestMatchers("/api/users/**", "/api/ai-insights").hasRole("ADMIN")
+
+                                                // Notifications — commuters can read their own notifications
+                                                .requestMatchers(HttpMethod.GET, "/api/user-notifications/**")
+                                                .hasAnyRole("COMMUTER", "ATTENDANT", "HUB_ADMIN", "ADMIN")
+                                                .requestMatchers("/api/user-notifications/**")
+                                                .hasAnyRole("COMMUTER", "ATTENDANT", "HUB_ADMIN", "ADMIN")
+
+                                                // Notification Broadcasts — ADMIN sends to all, HUB_ADMIN to own hub
+                                                .requestMatchers("/api/notifications/broadcasts/**")
+                                                .hasAnyRole("ADMIN", "HUB_ADMIN")
+
+                                                // Admin global settings — ADMIN only (HUB_ADMIN cannot change system-wide config)
+                                                .requestMatchers("/api/admin/**")
+                                                .hasRole("ADMIN")
 
                                                 .anyRequest().authenticated())
                                 .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);

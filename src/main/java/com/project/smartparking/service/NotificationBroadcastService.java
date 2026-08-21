@@ -185,7 +185,7 @@ public class NotificationBroadcastService {
                 if (req.getHubId() == null) {
                     throw new IllegalArgumentException("hubId is required when audience=HUB");
                 }
-                return userRepo.findByHubIdAndRole(req.getHubId(), User.Role.ATTENDANT);
+                return userRepo.findByHub_HubIdAndRole(req.getHubId(), User.Role.ATTENDANT);
             case "SINGLE_USER":
                 if (req.getUserId() == null) {
                     throw new IllegalArgumentException("userId is required when audience=SINGLE_USER");

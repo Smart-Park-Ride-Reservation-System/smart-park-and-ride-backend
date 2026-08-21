@@ -1,6 +1,7 @@
 package com.project.smartparking.repository;
 
 import com.project.smartparking.model.User;
+import com.project.smartparking.model.User.Role;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -12,5 +13,5 @@ public interface UserRepository extends JpaRepository<User, Long> {
     List<User> findByHubId(@Param("hubId") Long hubId);
 
     Optional<User> findByEmail(String email);
-    List<User> findByHubIdAndRole(Long hubId, User.Role role);
+List<User> findByHub_HubIdAndRole(Long hubId, Role role);
 }

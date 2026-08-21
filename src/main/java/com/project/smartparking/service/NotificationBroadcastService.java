@@ -11,7 +11,9 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
+import org.springframework.security.core.Authentication;
+import org.springframework.security.access.AccessDeniedException;
+import com.project.smartparking.model.User;
 import java.sql.Timestamp;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeParseException;
@@ -37,7 +39,8 @@ public class NotificationBroadcastService {
         return broadcastRepo.findAllByOrderByCreatedAtDesc();
     }
 
-    public NotificationBroadcast send(NotificationSendRequest req) {
+    public NotificationBroadcast send(NotificationSendRequest req, User caller) {
+        enforceAudienceRestrictions(req, caller);
         log.info("Broadcast requested: title='{}' audience={} hubId={} scheduledFor={}",
                 req.getTitle(), req.getAudience(), req.getHubId(), req.getScheduledFor());
 
@@ -96,7 +99,19 @@ public class NotificationBroadcastService {
         }
     }
 
-    public NotificationBroadcast resend(Long broadcastId) {
+    // NotificationBroadcastService
+    @Transactional(readOnly = true)
+    public List<NotificationBroadcast> getAllByHub(Long hubId) {
+        return broadcastRepo.findByHubIdOrderByCreatedAtDesc(hubId);
+    }
+
+    @Transactional(readOnly = true)
+    public NotificationBroadcast getById(Long id) {
+        return broadcastRepo.findById(id).orElse(null);
+    }
+
+    // Service
+    public NotificationBroadcast resend(Long broadcastId, User caller) {
         NotificationBroadcast old = broadcastRepo.findById(broadcastId)
                 .orElseThrow(() -> new RuntimeException("Broadcast not found: " + broadcastId));
 
@@ -110,7 +125,7 @@ public class NotificationBroadcastService {
         req.setScheduledFor(null);
         req.setSendEmail(old.isSendEmail());
 
-        return send(req);
+        return send(req, caller);
     }
 
     public void delete(Long broadcastId) {
@@ -170,7 +185,7 @@ public class NotificationBroadcastService {
                 if (req.getHubId() == null) {
                     throw new IllegalArgumentException("hubId is required when audience=HUB");
                 }
-                return userRepo.findByHubId(req.getHubId());
+                return userRepo.findByHubIdAndRole(req.getHubId(), User.Role.ATTENDANT);
             case "SINGLE_USER":
                 if (req.getUserId() == null) {
                     throw new IllegalArgumentException("userId is required when audience=SINGLE_USER");
@@ -184,7 +199,8 @@ public class NotificationBroadcastService {
     }
 
     private String buildAudienceLabel(NotificationSendRequest req) {
-        if (req.getAudience() == null) return "Unknown";
+        if (req.getAudience() == null)
+            return "Unknown";
 
         switch (req.getAudience().toUpperCase()) {
             case "ALL_USERS":
@@ -195,6 +211,33 @@ public class NotificationBroadcastService {
                 return "Single user #" + req.getUserId();
             default:
                 return req.getAudience();
+        }
+    }
+
+    private void enforceAudienceRestrictions(NotificationSendRequest req, User caller) {
+        if (caller.getRole() != User.Role.HUB_ADMIN)
+            return; // ADMIN unrestricted
+
+        if (caller.getHub() == null) {
+            throw new AccessDeniedException("Hub admin has no assigned hub");
+        }
+        Long ownHubId = caller.getHub().getHubId();
+
+        switch (req.getAudience() == null ? "" : req.getAudience().toUpperCase()) {
+            case "HUB":
+                req.setHubId(ownHubId); // never trust client-supplied hubId for this role
+                break;
+            case "SINGLE_USER":
+                User target = userRepo.findById(req.getUserId())
+                        .orElseThrow(() -> new IllegalArgumentException("User not found: " + req.getUserId()));
+                if (target.getRole() != User.Role.ATTENDANT
+                        || target.getHub() == null
+                        || !target.getHub().getHubId().equals(ownHubId)) {
+                    throw new AccessDeniedException("Hub admin can only message their own hub's attendants");
+                }
+                break;
+            default:
+                throw new AccessDeniedException("Hub admin cannot use audience=" + req.getAudience());
         }
     }
 }

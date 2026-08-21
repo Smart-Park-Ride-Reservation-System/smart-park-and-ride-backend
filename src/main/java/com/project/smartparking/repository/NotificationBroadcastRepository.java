@@ -8,4 +8,5 @@ import java.util.List;
 public interface NotificationBroadcastRepository extends JpaRepository<NotificationBroadcast, Long> {
     List<NotificationBroadcast> findAllByOrderByCreatedAtDesc();
     List<NotificationBroadcast> findByStatusAndScheduledForBefore(String status, Timestamp now);
+    List<NotificationBroadcast> findByHubIdOrderByCreatedAtDesc(Long hubId);
 }

@@ -39,6 +39,12 @@ public class User {
     @Enumerated(EnumType.STRING)
     private Role role;
 
+    @Column(name = "reset_token")
+private String resetToken;
+
+@Column(name = "reset_token_expiry")
+private Timestamp resetTokenExpiry;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Timestamp createdAt;
 

@@ -4,8 +4,9 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-
+import com.project.smartparking.dto.ForgotPasswordRequest;
 import com.project.smartparking.dto.LoginRequest;
+import com.project.smartparking.dto.ResetPasswordRequest;
 import com.project.smartparking.dto.SignupRequest;
 import com.project.smartparking.model.User;
 import com.project.smartparking.service.AuthService;
@@ -62,10 +63,42 @@ public class AuthController {
                         "userId", savedUser.getUserId()));
     }
 
+    @PostMapping("/forgot-password")
+    public ResponseEntity<?> forgotPassword(@RequestBody ForgotPasswordRequest request) {
+
+        if (request.getEmail() == null || request.getEmail().isBlank()) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body("Email is required");
+        }
+
+        authService.initiatePasswordReset(request.getEmail());
+
+        return ResponseEntity.ok(
+                Map.of("message", "If an account with that email exists, a reset link has been sent."));
+    }
+
+    @PostMapping("/reset-password")
+    public ResponseEntity<?> resetPassword(@RequestBody ResetPasswordRequest request) {
+
+        if (request.getToken() == null || request.getToken().isBlank()
+                || request.getNewPassword() == null || request.getNewPassword().isBlank()) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body("Token and new password are required");
+        }
+
+        boolean success = authService.resetPassword(request.getToken(), request.getNewPassword());
+
+        if (!success) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body("Reset link is invalid or has expired");
+        }
+
+        return ResponseEntity.ok(Map.of("message", "Password has been reset successfully"));
+    }
+
     @GetMapping("/me")
     public ResponseEntity<?> getCurrentUser(
-            @RequestHeader(value = "Authorization", required = false) String bearerToken
-    ) {
+            @RequestHeader(value = "Authorization", required = false) String bearerToken) {
         if (bearerToken == null || !bearerToken.startsWith("Bearer ")) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
                     .body("Missing or invalid token structure");
@@ -96,7 +129,8 @@ public class AuthController {
     }
 
     private Map<String, Object> toHubPayload(User user) {
-        if (user.getHub() == null) return null;
+        if (user.getHub() == null)
+            return null;
         Map<String, Object> hub = new HashMap<>();
         hub.put("hubId", user.getHub().getHubId());
         hub.put("name", user.getHub().getName());

@@ -138,6 +138,10 @@ public class SecurityConfig {
                                                 .hasAnyRole("ADMIN", "HUB_ADMIN")
 
                                                 // Users & AI
+                                                // before the broader /api/users/** rules
+                                                .requestMatchers("/api/users/me").authenticated()
+                                                .requestMatchers(HttpMethod.GET, "/api/users/**")
+                                                .hasAnyRole("ADMIN", "HUB_ADMIN")
                                                 .requestMatchers("/api/users/**", "/api/ai-insights").hasRole("ADMIN")
 
                                                 .anyRequest().authenticated())

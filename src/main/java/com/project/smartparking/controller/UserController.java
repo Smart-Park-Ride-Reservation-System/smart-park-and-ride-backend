@@ -8,6 +8,7 @@ import com.project.smartparking.dto.UserCreateUpdateRequest;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -28,7 +29,8 @@ public class UserController {
     @Autowired
     private PasswordEncoder passwordEncoder;
 
-    // GET CURRENT USER PROFILE
+    // GET CURRENT USER PROFILE — any authenticated user, viewing their own record
+    @PreAuthorize("isAuthenticated()")
     @GetMapping("/me")
     public ResponseEntity<User> getCurrentUser() {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
@@ -40,7 +42,8 @@ public class UserController {
         return ResponseEntity.ok(user);
     }
 
-    // UPDATE CURRENT USER PROFILE (Phone & Vehicles from Frontend)
+    // UPDATE CURRENT USER PROFILE — any authenticated user, editing their own record
+    @PreAuthorize("isAuthenticated()")
     @PatchMapping("/me")
     public ResponseEntity<User> updateCurrentUser(@RequestBody UserCreateUpdateRequest request) {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
@@ -66,13 +69,15 @@ public class UserController {
         return ResponseEntity.ok(updatedUser);
     }
 
-    // GET ALL USERS
+    // GET ALL USERS — matches config: GET /api/users/** -> ADMIN, HUB_ADMIN
+    @PreAuthorize("hasAnyRole('ADMIN', 'HUB_ADMIN')")
     @GetMapping
     public List<User> getAllUsers() {
         return repo.findAll();
     }
 
-    // CREATE USER
+    // CREATE USER — matches config: non-GET /api/users/** -> ADMIN only
+    @PreAuthorize("hasRole('ADMIN')")
     @PostMapping
     public User createUser(@RequestBody UserCreateUpdateRequest request) {
         User user = new User();
@@ -94,13 +99,15 @@ public class UserController {
         return repo.save(user);
     }
 
-    // DELETE USER
+    // DELETE USER — ADMIN only
+    @PreAuthorize("hasRole('ADMIN')")
     @DeleteMapping("/{id}")
     public void deleteUser(@PathVariable Long id) {
         repo.deleteById(id);
     }
 
-    // UPDATE USER BY ID (ADMIN USE)
+    // UPDATE USER BY ID (ADMIN USE) — ADMIN only
+    @PreAuthorize("hasRole('ADMIN')")
     @PatchMapping("/{id}")
     public User updateUser(
             @PathVariable Long id,
@@ -133,7 +140,8 @@ public class UserController {
         return repo.save(user);
     }
 
-    // UPDATE ROLE
+    // UPDATE ROLE — ADMIN only
+    @PreAuthorize("hasRole('ADMIN')")
     @PatchMapping("/{id}/role")
     public User updateRole(
             @PathVariable Long id,

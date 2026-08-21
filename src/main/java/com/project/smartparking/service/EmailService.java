@@ -16,7 +16,6 @@ public class EmailService {
     @Autowired
     private JavaMailSender mailSender;
 
-    // Original simple text email method (kept in case other parts of the app use it)
     public void send(String to, String subject, String body) {
         try {
             SimpleMailMessage message = new SimpleMailMessage();

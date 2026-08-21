@@ -7,6 +7,9 @@ import com.project.smartparking.repository.HubRepository;
 import com.project.smartparking.dto.UserCreateUpdateRequest;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.*;
 
@@ -25,7 +28,45 @@ public class UserController {
     @Autowired
     private PasswordEncoder passwordEncoder;
 
-    // GET
+    // GET CURRENT USER PROFILE
+    @GetMapping("/me")
+    public ResponseEntity<User> getCurrentUser() {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        String email = auth.getName();
+
+        User user = repo.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("Authenticated user not found"));
+
+        return ResponseEntity.ok(user);
+    }
+
+    // UPDATE CURRENT USER PROFILE (Phone & Vehicles from Frontend)
+    @PatchMapping("/me")
+    public ResponseEntity<User> updateCurrentUser(@RequestBody UserCreateUpdateRequest request) {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        String email = auth.getName();
+
+        User user = repo.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("Authenticated user not found"));
+
+        if (request.getPhone() != null) {
+            user.setPhone(request.getPhone());
+        }
+        if (request.getVehicles() != null) {
+            user.setVehicles(request.getVehicles());
+        }
+        if (request.getFirstName() != null) {
+            user.setFirstName(request.getFirstName());
+        }
+        if (request.getLastName() != null) {
+            user.setLastName(request.getLastName());
+        }
+
+        User updatedUser = repo.save(user);
+        return ResponseEntity.ok(updatedUser);
+    }
+
+    // GET ALL USERS
     @GetMapping
     public List<User> getAllUsers() {
         return repo.findAll();
@@ -38,11 +79,14 @@ public class UserController {
         user.setFirstName(request.getFirstName());
         user.setLastName(request.getLastName());
         user.setEmail(request.getEmail());
+        user.setPhone(request.getPhone());
+        user.setVehicles(request.getVehicles());
         user.setPassword(passwordEncoder.encode(request.getPassword() != null ? request.getPassword() : "default123"));
         user.setRole(request.getRole());
         user.setStatus(request.getStatus() != null ? request.getStatus() : "ACTIVE");
 
-        if (request.getHubId() != null && (request.getRole() == User.Role.ATTENDANT || request.getRole() == User.Role.HUB_ADMIN)) {
+        if (request.getHubId() != null
+                && (request.getRole() == User.Role.ATTENDANT || request.getRole() == User.Role.HUB_ADMIN)) {
             Hub hub = hubRepo.findById(request.getHubId()).orElse(null);
             user.setHub(hub);
         }
@@ -56,22 +100,30 @@ public class UserController {
         repo.deleteById(id);
     }
 
-    // UPDATE USER
+    // UPDATE USER BY ID (ADMIN USE)
     @PatchMapping("/{id}")
     public User updateUser(
             @PathVariable Long id,
-            @RequestBody UserCreateUpdateRequest request
-    ) {
-
+            @RequestBody UserCreateUpdateRequest request) {
         User user = repo.findById(id).orElseThrow();
 
-        if (request.getFirstName() != null) user.setFirstName(request.getFirstName());
-        if (request.getLastName() != null) user.setLastName(request.getLastName());
-        if (request.getEmail() != null) user.setEmail(request.getEmail());
-        if (request.getRole() != null) user.setRole(request.getRole());
-        if (request.getStatus() != null) user.setStatus(request.getStatus());
+        if (request.getFirstName() != null)
+            user.setFirstName(request.getFirstName());
+        if (request.getLastName() != null)
+            user.setLastName(request.getLastName());
+        if (request.getEmail() != null)
+            user.setEmail(request.getEmail());
+        if (request.getRole() != null)
+            user.setRole(request.getRole());
+        if (request.getStatus() != null)
+            user.setStatus(request.getStatus());
+        if (request.getPhone() != null)
+            user.setPhone(request.getPhone());
+        if (request.getVehicles() != null)
+            user.setVehicles(request.getVehicles());
 
-        if (request.getHubId() != null && (user.getRole() == User.Role.ATTENDANT || user.getRole() == User.Role.HUB_ADMIN)) {
+        if (request.getHubId() != null
+                && (user.getRole() == User.Role.ATTENDANT || user.getRole() == User.Role.HUB_ADMIN)) {
             Hub hub = hubRepo.findById(request.getHubId()).orElse(null);
             user.setHub(hub);
         } else if (user.getRole() != User.Role.ATTENDANT && user.getRole() != User.Role.HUB_ADMIN) {
@@ -85,9 +137,7 @@ public class UserController {
     @PatchMapping("/{id}/role")
     public User updateRole(
             @PathVariable Long id,
-            @RequestBody UserCreateUpdateRequest request
-    ) {
-
+            @RequestBody UserCreateUpdateRequest request) {
         User user = repo.findById(id).orElseThrow();
         user.setRole(request.getRole());
         if (user.getRole() != User.Role.ATTENDANT && user.getRole() != User.Role.HUB_ADMIN) {

@@ -24,10 +24,14 @@ public class Reservation {
     @JoinColumn(name = "slot_id", nullable = false)
     private ParkingSlot slot;
 
-    // Fixed: User entity association instead of a raw Long ID
-    @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "user_id", nullable = false)
+    // Null = walk-in (no commuter account). Populated = commuter's own booking.
+    @ManyToOne(fetch = FetchType.LAZY, optional = true)
+    @JoinColumn(name = "user_id", nullable = true)
     private User user;
+
+    // Which attendant created this — set only for walk-ins/manual entries, null for self-booked
+    @Column(name = "created_by_attendant_id")
+    private Long createdByAttendantId;
 
     @Column(name = "vehicle_no", length = 20)
     private String vehicleNo;
@@ -38,10 +42,12 @@ public class Reservation {
     @Column(name = "booking_date")
     private LocalDateTime bookingDate;
 
+    // Always required — the one timestamp everything hinges on (booking + check-in reference)
     @Column(name = "scheduled_in", nullable = false)
     private LocalDateTime scheduledIn;
 
-    @Column(name = "scheduled_out", nullable = false)
+    // No longer required — policy is check-in-time-only booking, no promised checkout time
+    @Column(name = "scheduled_out")
     private LocalDateTime scheduledOut;
 
     @Column(name = "actual_in")
@@ -66,6 +72,7 @@ public class Reservation {
 
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;
+
     @OneToMany(mappedBy = "reservation", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     private List<Payment> payments;
 
@@ -81,7 +88,12 @@ public class Reservation {
     }
 
     public enum ReservationStatus {
-        PENDING, CONFIRMED, CHECKED_IN, COMPLETED, CANCELLED, EXPIRED , PAID
+        PENDING,      // commuter booked, not yet check-in time / not yet confirmed
+        CONFIRMED,    // commuter booking confirmed, awaiting check-in
+        CHECKED_IN,   // vehicle physically in the slot (commuter checked in, or walk-in assigned)
+        COMPLETED,    // checked out, fee calculated
+        CANCELLED,    // commuter cancelled before check-in
+        EXPIRED,      // commuter no-show — passed grace period without check-in
+        PAID          // fee settled (if you track payment separately from completion)
     }
-    
 }

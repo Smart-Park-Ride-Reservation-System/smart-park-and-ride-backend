@@ -183,7 +183,9 @@ public class ParkingSlotService {
     public List<ParkingSlot> findByLot(Long hubId, Long lotId, LocalDateTime startTime, LocalDateTime endTime) {
         List<ParkingSlot> slots = slotRepo.findByLot_LotId(lotId);
 
-        List<Long> reservedSlotIds = reservationRepo.findReservedSlotIdsInWindow(hubId, startTime, endTime);
+        LocalDateTime now = LocalDateTime.now();
+        List<Long> reservedSlotIds = reservationRepo.findReservedSlotIdsInWindow(
+                hubId, startTime, endTime, now.minusMinutes(10), now.minusMinutes(15));
 
         for (ParkingSlot slot : slots) {
             if (slot.getStatus() == ParkingSlot.SlotStatus.OUT_OF_SERVICE) {
@@ -192,7 +194,7 @@ public class ParkingSlotService {
 
             boolean isSensorOccupied = slot.getSensor() != null && slot.getSensor().isOccupiedSlot();
 
-            if (isSensorOccupied) {
+            if (isSensorOccupied || slot.getStatus() == ParkingSlot.SlotStatus.OCCUPIED) {
                 slot.setStatus(ParkingSlot.SlotStatus.OCCUPIED);
             } else if (reservedSlotIds.contains(slot.getSlotId())) {
                 slot.setStatus(ParkingSlot.SlotStatus.RESERVED);

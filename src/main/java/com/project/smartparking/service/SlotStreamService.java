@@ -35,9 +35,12 @@ public class SlotStreamService {
     private final Map<String, DatabaseReference> refsByLot = new ConcurrentHashMap<>();
     private final Map<String, List<SlotStateDto>> lastStateByLot = new ConcurrentHashMap<>();
 
+    
+    private final Map<String, Map<String, Boolean>> firebaseOccupancyByLot = new ConcurrentHashMap<>();
+
     public SseEmitter subscribe(Long hubId, Long lotId) {
         String key = key(hubId, lotId);
-        SseEmitter emitter = new SseEmitter(0L); // no timeout; stays open until client disconnects
+        SseEmitter emitter = new SseEmitter(0L);
 
         emittersByLot.computeIfAbsent(key, k -> new CopyOnWriteArrayList<>()).add(emitter);
 
@@ -50,10 +53,41 @@ public class SlotStreamService {
             attachFirebaseListener(hubId, lotId, key);
         } else {
             List<SlotStateDto> cached = lastStateByLot.get(key);
-            if (cached != null) sendSafely(emitter, cached);
+            if (cached != null) {
+                sendSafely(emitter, cached);
+            }
         }
 
         return emitter;
+    }
+
+    public void notifySlotUpdate(ParkingSlot slot) {
+        if (slot != null && slot.getLot() != null) {
+            Long lotId = slot.getLot().getLotId();
+            Long hubId = (slot.getLot().getHub() != null) ? slot.getLot().getHub().getHubId() : null;
+            if (hubId != null) {
+                notifyLotChange(hubId, lotId);
+            }
+        }
+    }
+
+    public void notifySlotUpdate(Long hubId, ParkingSlot slot) {
+        if (slot != null && slot.getLot() != null) {
+            notifyLotChange(hubId, slot.getLot().getLotId());
+        }
+    }
+
+   
+    public void notifyLotChange(Long hubId, Long lotId) {
+        String key = key(hubId, lotId);
+        if (!emittersByLot.containsKey(key)) {
+            return; 
+        }
+
+        Map<String, Boolean> occupancy = firebaseOccupancyByLot.getOrDefault(key, Collections.emptyMap());
+        List<SlotStateDto> states = computeSlotStates(hubId, lotId, occupancy);
+        lastStateByLot.put(key, states);
+        pushToLot(key, states);
     }
 
     private void attachFirebaseListener(Long hubId, Long lotId, String key) {
@@ -71,6 +105,10 @@ public class SlotStreamService {
                     Boolean occupied = child.child("occupied").getValue(Boolean.class);
                     occupancy.put(child.getKey(), occupied != null && occupied);
                 }
+
+                // Cache firebase state
+                firebaseOccupancyByLot.put(key, occupancy);
+
                 List<SlotStateDto> states = computeSlotStates(hubId, lotId, occupancy);
                 lastStateByLot.put(key, states);
                 pushToLot(key, states);
@@ -87,24 +125,34 @@ public class SlotStreamService {
         log.info("Attached Firebase listener for lot stream {}", key);
     }
 
-   
     private List<SlotStateDto> computeSlotStates(Long hubId, Long lotId, Map<String, Boolean> occupancy) {
         List<ParkingSlot> slots = slotRepo.findByLot_LotId(lotId);
 
-        LocalDateTime start = LocalDateTime.now();
+        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime start = now;
         LocalDateTime end = start.plusHours(2);
-        List<Long> reservedSlotIds = reservationRepo.findReservedSlotIdsInWindow(hubId, start, end);
+        LocalDateTime pendingCutoff = now.minusMinutes(10);
+        LocalDateTime noShowCutoff = now.minusMinutes(15);
+
+        List<Long> reservedSlotIds = reservationRepo.findReservedSlotIdsInWindow(
+                hubId, start, end, pendingCutoff, noShowCutoff);
 
         List<SlotStateDto> result = new ArrayList<>();
         for (ParkingSlot slot : slots) {
             ParkingSlot.SlotStatus status;
+
             if (slot.getStatus() == ParkingSlot.SlotStatus.OUT_OF_SERVICE) {
                 status = ParkingSlot.SlotStatus.OUT_OF_SERVICE;
-            } else if (occupancy.getOrDefault(slot.getSlotCode(), false)) {
+            }
+            else if (occupancy.getOrDefault(slot.getSlotCode(), false)
+                    || slot.getStatus() == ParkingSlot.SlotStatus.OCCUPIED) {
                 status = ParkingSlot.SlotStatus.OCCUPIED;
-            } else if (reservedSlotIds.contains(slot.getSlotId())) {
+            }
+            else if (reservedSlotIds.contains(slot.getSlotId())
+                    || slot.getStatus() == ParkingSlot.SlotStatus.RESERVED) {
                 status = ParkingSlot.SlotStatus.RESERVED;
-            } else {
+            }
+            else {
                 status = ParkingSlot.SlotStatus.AVAILABLE;
             }
             result.add(new SlotStateDto(slot.getSlotId(), slot.getSlotCode(), status));
@@ -114,7 +162,8 @@ public class SlotStreamService {
 
     private void pushToLot(String key, List<SlotStateDto> states) {
         List<SseEmitter> subs = emittersByLot.get(key);
-        if (subs == null) return;
+        if (subs == null)
+            return;
         for (SseEmitter emitter : subs) {
             sendSafely(emitter, states);
         }
@@ -131,17 +180,19 @@ public class SlotStreamService {
     private void removeEmitter(Long hubId, Long lotId, SseEmitter emitter) {
         String key = key(hubId, lotId);
         List<SseEmitter> subs = emittersByLot.get(key);
-        if (subs == null) return;
+        if (subs == null)
+            return;
         subs.remove(emitter);
 
         if (subs.isEmpty()) {
             emittersByLot.remove(key);
+            firebaseOccupancyByLot.remove(key);
             ValueEventListener listener = listenersByLot.remove(key);
             DatabaseReference ref = refsByLot.remove(key);
             lastStateByLot.remove(key);
             if (listener != null && ref != null) {
                 ref.removeEventListener(listener);
-                log.info("Detached Firebase listener for lot stream {} (no subscribers left)", key);
+                log.info("Detached Firebase listener for lot stream {}", key);
             }
         }
     }
@@ -150,5 +201,6 @@ public class SlotStreamService {
         return hubId + ":" + lotId;
     }
 
-    public record SlotStateDto(Long slotId, String slotCode, ParkingSlot.SlotStatus status) {}
+    public record SlotStateDto(Long slotId, String slotCode, ParkingSlot.SlotStatus status) {
+    }
 }

@@ -5,6 +5,7 @@ import com.google.firebase.database.FirebaseDatabase;
 import com.project.smartparking.Config.AuthenticatedUser;
 import com.project.smartparking.dto.GlobalSettingsDTO;
 import com.project.smartparking.dto.ReservationDto;
+import com.project.smartparking.dto.WalkInRequest;
 import com.project.smartparking.model.ParkingLot;
 import com.project.smartparking.model.ParkingSlot;
 import com.project.smartparking.model.Payment;
@@ -16,15 +17,20 @@ import com.project.smartparking.repository.PaymentRepository;
 import com.project.smartparking.repository.ReservationRepository;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.ResponseEntity;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -33,6 +39,9 @@ import java.util.UUID;
 @Slf4j
 @Service
 public class ReservationService {
+
+    // Sri Lanka TimeZone Standard
+    private static final ZoneId SRI_LANKA_ZONE = ZoneId.of("Asia/Colombo");
 
     @Autowired
     private ReservationRepository reservationRepo;
@@ -46,8 +55,18 @@ public class ReservationService {
     private GlobalSettingsService globalSettingsService;
     @Autowired
     private ParkingLotRepository lotRepo;
+    @Autowired
+    private SlotStreamService slotStreamService;
 
-    @Transactional
+    private LocalDateTime getSriLankaNow() {
+        return ZonedDateTime.now(SRI_LANKA_ZONE).toLocalDateTime();
+    }
+
+    private boolean isSlotFree(ParkingSlot slot) {
+        return slot.getStatus() == ParkingSlot.SlotStatus.AVAILABLE;
+    }
+
+    @Transactional(readOnly = true)
     public List<ReservationDto> getAll() {
         return reservationRepo.findAll().stream().map(ReservationDto::from).toList();
     }
@@ -58,8 +77,29 @@ public class ReservationService {
     }
 
     public List<Reservation> getByUser(Long userId) {
-        // Aligned with updated repository method name: findByUser_UserId
         return reservationRepo.findByUser_UserId(userId);
+    }
+
+    @Transactional(readOnly = true)
+    public List<Map<String, Object>> getActiveReservationsForLot(Long hubId, Long lotId) {
+        return reservationRepo.findAll().stream()
+                .filter(r -> r.getStatus() == ReservationStatus.CHECKED_IN)
+                .filter(r -> r.getSlot() != null
+                        && r.getSlot().getLot() != null
+                        && lotId.equals(r.getSlot().getLot().getLotId())
+                        && r.getSlot().getLot().getHub() != null
+                        && hubId.equals(r.getSlot().getLot().getHub().getHubId()))
+                .map(r -> {
+                    Map<String, Object> m = new HashMap<>();
+                    m.put("reservationId", r.getReservationId());
+                    m.put("slotCode", r.getSlot().getSlotCode());
+                    m.put("vehicleNo", r.getVehicleNo());
+                    m.put("ticketQrCode", r.getQrToken());
+                    m.put("entryTime", r.getActualIn() != null ? r.getActualIn().toString() : null);
+                    m.put("status", r.getStatus().name());
+                    return m;
+                })
+                .toList();
     }
 
     private void assertHubAccess(Long slotId) {
@@ -85,7 +125,43 @@ public class ReservationService {
     }
 
     @Transactional
-    public Reservation create(Reservation r) {
+    public synchronized Reservation createWalkIn(WalkInRequest request, Long attendantId) {
+        ParkingSlot slot = slotRepo.findById(request.getSlotId())
+                .orElseThrow(() -> new IllegalArgumentException("Invalid slotId"));
+
+        assertHubAccess(slot.getSlotId());
+
+        if (!isSlotFree(slot)) {
+            throw new IllegalStateException("Slot is not free");
+        }
+
+        LocalDateTime slNow = getSriLankaNow();
+
+        Reservation r = new Reservation();
+        r.setSlot(slot);
+        r.setUser(null);
+        r.setCreatedByAttendantId(attendantId);
+        r.setVehicleNo(request.getVehicleNo());
+        r.setVehicleType(request.getVehicleType());
+        r.setScheduledIn(slNow);
+        r.setActualIn(slNow);
+        r.setStatus(ReservationStatus.CHECKED_IN);
+        r.setQrToken(UUID.randomUUID().toString());
+
+        Reservation saved = reservationRepo.save(r);
+
+        slot.setStatus(ParkingSlot.SlotStatus.OCCUPIED);
+        slotRepo.save(slot);
+        slotStreamService.notifySlotUpdate(slot);
+        syncSlotToFirebase(slot, false);
+
+        openGate("in");
+
+        return saved;
+    }
+
+    @Transactional
+    public synchronized Reservation create(Reservation r) {
         if (r.getSlot() == null || r.getSlot().getSlotId() == null)
             throw new IllegalArgumentException("slot is required");
         if (r.getUser() == null || r.getUser().getUserId() == null)
@@ -94,28 +170,48 @@ public class ReservationService {
             throw new IllegalArgumentException("scheduledIn and scheduledOut are required");
 
         Long slotId = r.getSlot().getSlotId();
+
+        // Fetch slot record
         ParkingSlot slot = slotRepo.findById(slotId)
                 .orElseThrow(() -> new IllegalArgumentException("Invalid slotId: " + slotId));
 
-        // Check if slot is reserved in the given time frame
+        LocalDateTime slNow = getSriLankaNow();
+
+        // FIX 1: Set 2-minute soft-lock threshold for PENDING checkout entries to
+        // prevent simultaneous bookings
+        LocalDateTime pendingCutoff = slNow.minusMinutes(2);
+
+        // 15-minute no-show cutoff window
+        LocalDateTime noShowCutoff = slNow.minusMinutes(15);
+
+        // FIX 2: Prevent concurrent bookings for the same time window
         List<Long> conflictingSlots = reservationRepo.findReservedSlotIdsInWindow(
                 slot.getLot().getHub().getHubId(),
                 r.getScheduledIn(),
-                r.getScheduledOut());
+                r.getScheduledOut(),
+                pendingCutoff,
+                noShowCutoff);
 
         if (conflictingSlots.contains(slotId)) {
-            throw new IllegalStateException("This slot is already reserved for the selected time window.");
+            throw new IllegalStateException(
+                    "This slot has just been selected or reserved by another user. Please choose another slot.");
         }
 
         r.setSlot(slot);
         r.setStatus(ReservationStatus.PENDING);
+        r.setCreatedAt(slNow); // Guarantee Sri Lanka creation time for holding logic
         r.setReservationFee(BigDecimal.valueOf(200.0));
 
-        slot.setStatus(ParkingSlot.SlotStatus.RESERVED);
-        slotRepo.save(slot);
+        // FIX 3: Prevent marking real-time slot as RESERVED when booking for future
+        // dates (e.g. 23rd at 10 AM)
+        boolean isImmediateBooking = !r.getScheduledIn().isAfter(slNow.plusMinutes(15));
 
-        // Non-blocking Firebase update recommended
-        syncSlotToFirebase(slot, false);
+        if (isImmediateBooking && slot.getStatus() == ParkingSlot.SlotStatus.AVAILABLE) {
+            slot.setStatus(ParkingSlot.SlotStatus.RESERVED);
+            slotRepo.save(slot);
+            slotStreamService.notifySlotUpdate(slot);
+            syncSlotToFirebase(slot, false);
+        }
 
         return reservationRepo.save(r);
     }
@@ -169,6 +265,13 @@ public class ReservationService {
     public synchronized Reservation confirmPayment(Long id) {
         Reservation r = getById(id);
 
+        // Explicitly expire stale PENDING reservations upon payment attempt
+        if (r.getStatus() == ReservationStatus.PENDING
+                && r.getCreatedAt().isBefore(getSriLankaNow().minusMinutes(2))) {
+            expire(r);
+            throw new IllegalStateException("Your 2-minute hold window has expired. Please select a slot again.");
+        }
+
         if (List.of(ReservationStatus.CONFIRMED, ReservationStatus.CHECKED_IN, ReservationStatus.COMPLETED)
                 .contains(r.getStatus())) {
             return r;
@@ -214,12 +317,13 @@ public class ReservationService {
             throw new IllegalStateException("Not in valid state for check-in: " + r.getStatus());
         }
 
-        r.setActualIn(LocalDateTime.now());
+        r.setActualIn(getSriLankaNow());
         r.setStatus(ReservationStatus.CHECKED_IN);
 
         slotRepo.findById(r.getSlot().getSlotId()).ifPresent(slot -> {
             slot.setStatus(ParkingSlot.SlotStatus.OCCUPIED);
             slotRepo.save(slot);
+            slotStreamService.notifySlotUpdate(slot);
             syncSlotToFirebase(slot, false);
         });
 
@@ -237,12 +341,13 @@ public class ReservationService {
             throw new IllegalStateException("Not in valid state for check-out: " + r.getStatus());
         }
 
-        r.setActualOut(LocalDateTime.now());
+        r.setActualOut(getSriLankaNow());
         r.setStatus(ReservationStatus.COMPLETED);
 
         slotRepo.findById(r.getSlot().getSlotId()).ifPresent(slot -> {
             slot.setStatus(ParkingSlot.SlotStatus.AVAILABLE);
             slotRepo.save(slot);
+            slotStreamService.notifySlotUpdate(slot);
             syncSlotToFirebase(slot, false);
         });
 
@@ -259,12 +364,13 @@ public class ReservationService {
             throw new IllegalStateException("Not in valid state for check-in: " + r.getStatus());
         }
 
-        r.setActualIn(LocalDateTime.now());
+        r.setActualIn(getSriLankaNow());
         r.setStatus(ReservationStatus.CHECKED_IN);
 
         slotRepo.findById(r.getSlot().getSlotId()).ifPresent(slot -> {
             slot.setStatus(ParkingSlot.SlotStatus.OCCUPIED);
             slotRepo.save(slot);
+            slotStreamService.notifySlotUpdate(slot);
             syncSlotToFirebase(slot, false);
         });
 
@@ -281,12 +387,13 @@ public class ReservationService {
             throw new IllegalStateException("Not checked in");
         }
 
-        r.setActualOut(LocalDateTime.now());
+        r.setActualOut(getSriLankaNow());
         r.setStatus(ReservationStatus.COMPLETED);
 
         slotRepo.findById(r.getSlot().getSlotId()).ifPresent(slot -> {
             slot.setStatus(ParkingSlot.SlotStatus.AVAILABLE);
             slotRepo.save(slot);
+            slotStreamService.notifySlotUpdate(slot);
             syncSlotToFirebase(slot, false);
         });
 
@@ -334,18 +441,17 @@ public class ReservationService {
             paymentRepo.save(payment);
         }
 
-        r.setStatus(ReservationStatus.PAID); // <-- the fix
+        r.setStatus(ReservationStatus.PAID);
         return reservationRepo.save(r);
     }
 
     private double calculateParkingCharge(Reservation r) {
-        if (subscriptionService.getActiveSubscription(r.getUser().getUserId()) != null) {
+        if (r.getUser() != null && subscriptionService.getActiveSubscription(r.getUser().getUserId()) != null) {
             return 0.0;
         }
 
         long minutes = java.time.Duration.between(r.getActualIn(), r.getActualOut()).toMinutes();
         GlobalSettingsDTO settings = globalSettingsService.getSettings();
-
         if (settings.getEntryGracePeriodMinutes() != null && minutes <= settings.getEntryGracePeriodMinutes()) {
             return 0.0;
         }
@@ -353,9 +459,15 @@ public class ReservationService {
         double hours = minutes / 60.0;
         double rate;
         String vehicleType = r.getVehicleType() != null ? r.getVehicleType().toUpperCase() : "CAR";
+
         switch (vehicleType) {
             case "BIKE":
                 rate = settings.getBikeHourlyRate() != null ? settings.getBikeHourlyRate() : 50.0;
+                break;
+            case "TUK":
+            case "TUK TUK":
+            case "THREE_WHEELER":
+                rate = settings.getTukHourlyRate() != null ? settings.getTukHourlyRate() : 70.0;
                 break;
             case "CAR":
                 rate = settings.getCarHourlyRate() != null ? settings.getCarHourlyRate() : 100.0;
@@ -396,16 +508,14 @@ public class ReservationService {
     @Scheduled(fixedRate = 30000)
     @Transactional
     public void expireStaleReservations() {
-        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime slNow = getSriLankaNow();
 
-        // Updated status parameter to ReservationStatus enum
         reservationRepo
-                .findByStatusAndCreatedAtBefore(ReservationStatus.PENDING, now.minusMinutes(10))
+                .findByStatusAndCreatedAtBefore(ReservationStatus.PENDING, slNow.minusMinutes(2))
                 .forEach(this::expire);
 
-        LocalDateTime arrivalGraceThreshold = now.minusMinutes(15);
+        LocalDateTime arrivalGraceThreshold = slNow.minusMinutes(15);
 
-        // Updated status parameter to ReservationStatus enum
         reservationRepo
                 .findByStatusAndScheduledInBeforeAndActualInIsNull(ReservationStatus.CONFIRMED, arrivalGraceThreshold)
                 .forEach(this::expire);
@@ -420,7 +530,6 @@ public class ReservationService {
     }
 
     private void freeSlotIfNoActiveReservation(Long slotId) {
-        // Updated query call to pass ReservationStatus enums
         boolean stillActive = reservationRepo
                 .findBySlotSlotIdAndStatusIn(slotId,
                         List.of(ReservationStatus.PENDING, ReservationStatus.CONFIRMED, ReservationStatus.CHECKED_IN))
@@ -439,6 +548,7 @@ public class ReservationService {
                 if (slot.getStatus() != ParkingSlot.SlotStatus.OUT_OF_SERVICE) {
                     slot.setStatus(ParkingSlot.SlotStatus.AVAILABLE);
                     slotRepo.save(slot);
+                    slotStreamService.notifySlotUpdate(slot);
                     syncSlotToFirebase(slot, false);
                     log.info("[ReservationService] Slot {} freed and marked AVAILABLE", slotId);
                 }
@@ -454,6 +564,8 @@ public class ReservationService {
 
         slot.setStatus(status);
         slotRepo.save(slot);
+
+        slotStreamService.notifySlotUpdate(slot);
         syncSlotToFirebase(slot, true);
 
         return slot;
@@ -476,5 +588,4 @@ public class ReservationService {
 
         slotRef.updateChildrenAsync(update);
     }
-
 }

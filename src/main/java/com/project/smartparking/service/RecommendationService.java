@@ -27,7 +27,7 @@ public class RecommendationService {
 
     private static final Logger log = LoggerFactory.getLogger(RecommendationService.class);
 
-    @Value("${groq.api.key}")
+    @Value("${groq.api.key:}")
     private String groqApiKey;
 
     private static final String GROQ_MODEL = "llama-3.1-8b-instant";
@@ -39,25 +39,35 @@ public class RecommendationService {
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     public RecommendationService(RestTemplate restTemplate,
-                                  UserSubscriptionRepository userSubscriptionRepository,
-                                  SubscriptionPackageRepository packageRepository) {
+                                 UserSubscriptionRepository userSubscriptionRepository,
+                                 SubscriptionPackageRepository packageRepository) {
         this.restTemplate = restTemplate;
         this.userSubscriptionRepository = userSubscriptionRepository;
         this.packageRepository = packageRepository;
     }
 
     public RecommendationResponse getRecommendation(Long userId) {
-        List<UserSubscription> history = userSubscriptionRepository.findByUser_UserId(userId);
         List<SubscriptionPackage> packages = packageRepository.findByActiveTrue();
 
+        // 1. Guard against empty active packages without throwing an unhandled exception
         if (packages.isEmpty()) {
-            throw new IllegalStateException("No active packages to recommend from");
+            log.warn("No active subscription packages found in DB for recommendation.");
+            return new RecommendationResponse(null, "Standard Package", "No active packages currently available.");
         }
+
+        // 2. Guard against missing or placeholders in Groq API Key
+        if (groqApiKey == null || groqApiKey.isBlank() || groqApiKey.startsWith("${")) {
+            log.warn("Groq API key is missing or unconfigured. Falling back to default package.");
+            return fallback(packages);
+        }
+
+        List<UserSubscription> history = userSubscriptionRepository.findByUser_UserId(userId);
 
         String historySummary = history.isEmpty()
                 ? "No previous subscriptions."
                 : history.stream()
-                    .map(s -> s.getSubscriptionPackage().getName() + " (" + s.getStatus() + ")")
+                    .map(s -> (s.getSubscriptionPackage() != null ? s.getSubscriptionPackage().getName() : "Unknown") 
+                            + " (" + s.getStatus() + ")")
                     .reduce((a, b) -> a + ", " + b)
                     .orElse("No previous subscriptions.");
 

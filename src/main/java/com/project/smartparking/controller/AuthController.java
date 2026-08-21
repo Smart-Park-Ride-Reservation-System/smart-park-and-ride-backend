@@ -11,6 +11,7 @@ import com.project.smartparking.model.User;
 import com.project.smartparking.service.AuthService;
 import com.project.smartparking.service.JwtService;
 
+import java.util.HashMap;
 import java.util.Map;
 
 @RestController
@@ -30,12 +31,15 @@ public class AuthController {
 
         if (user != null) {
             String token = jwtService.generateToken(user);
-            return ResponseEntity.ok(Map.of(
-                    "token", token,
-                    "role", user.getRole().name(),
-                    "firstName", user.getFirstName() != null ? user.getFirstName() : "",
-                    "userId", user.getUserId()
-            ));
+
+            Map<String, Object> response = new HashMap<>();
+            response.put("token", token);
+            response.put("role", user.getRole().name());
+            response.put("firstName", user.getFirstName() != null ? user.getFirstName() : "");
+            response.put("userId", user.getUserId());
+            response.put("hub", toHubPayload(user));
+
+            return ResponseEntity.ok(response);
         }
 
         return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
@@ -57,6 +61,7 @@ public class AuthController {
                         "message", "Account created successfully",
                         "userId", savedUser.getUserId()));
     }
+
     @GetMapping("/me")
     public ResponseEntity<?> getCurrentUser(
             @RequestHeader(value = "Authorization", required = false) String bearerToken
@@ -66,27 +71,35 @@ public class AuthController {
                     .body("Missing or invalid token structure");
         }
 
-                    String token = bearerToken.substring(7);
+        String token = bearerToken.substring(7);
 
         try {
-            
-            String email = jwtService.extractEmail(token); 
+            String email = jwtService.extractEmail(token);
+            User user = authService.findUserByEmail(email);
 
-            User user = authService.findUserByEmail(email); 
-
-            if (user != null) {
-                return ResponseEntity.ok(Map.of(
-                        "userId", user.getUserId(),
-                        "email", user.getEmail(),
-                        "role", user.getRole().name(),
-                        "firstName", user.getFirstName() != null ? user.getFirstName() : ""
-                ));
+            if (user == null) {
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("User not found");
             }
 
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("User not found");
+            Map<String, Object> response = new HashMap<>();
+            response.put("userId", user.getUserId());
+            response.put("email", user.getEmail());
+            response.put("role", user.getRole().name());
+            response.put("firstName", user.getFirstName() != null ? user.getFirstName() : "");
+            response.put("hub", toHubPayload(user));
+
+            return ResponseEntity.ok(response);
 
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Invalid or expired token");
         }
+    }
+
+    private Map<String, Object> toHubPayload(User user) {
+        if (user.getHub() == null) return null;
+        Map<String, Object> hub = new HashMap<>();
+        hub.put("hubId", user.getHub().getHubId());
+        hub.put("name", user.getHub().getName());
+        return hub;
     }
 }

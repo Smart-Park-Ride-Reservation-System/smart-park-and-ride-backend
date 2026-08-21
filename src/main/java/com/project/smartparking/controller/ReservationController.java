@@ -1,6 +1,8 @@
 package com.project.smartparking.controller;
 
+import com.project.smartparking.Config.AuthenticatedUser;
 import com.project.smartparking.dto.ReservationDto;
+import com.project.smartparking.dto.WalkInRequest;
 import com.project.smartparking.model.ParkingSlot;
 import com.project.smartparking.model.Reservation;
 import com.project.smartparking.service.ReservationService;
@@ -8,8 +10,11 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.security.core.Authentication;
 
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -103,6 +108,31 @@ public class ReservationController {
     @PreAuthorize("hasAnyRole('ATTENDANT', 'ADMIN')")
     public ResponseEntity<?> checkOut(@PathVariable Long id) {
         return ResponseEntity.ok(reservationService.checkOut(id));
+    }
+
+    @PostMapping("/walk-in")
+    @PreAuthorize("hasAnyRole('ATTENDANT', 'ADMIN')")
+    public ResponseEntity<?> walkIn(@RequestBody WalkInRequest request) {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        AuthenticatedUser current = (AuthenticatedUser) auth.getPrincipal();
+
+        Reservation saved = reservationService.createWalkIn(request, current.userId());
+
+        Map<String, Object> resp = new HashMap<>();
+        resp.put("reservationId", saved.getReservationId());
+        resp.put("slotCode", saved.getSlot().getSlotCode());
+        resp.put("vehicleNo", saved.getVehicleNo());
+        resp.put("ticketQrCode", saved.getQrToken());
+        resp.put("entryTime", saved.getActualIn() != null ? saved.getActualIn().toString() : null);
+        resp.put("status", saved.getStatus().name());
+
+        return ResponseEntity.ok(resp);
+    }
+
+    @GetMapping("/active")
+    @PreAuthorize("hasAnyRole('ATTENDANT', 'ADMIN')")
+    public ResponseEntity<?> getActive(@RequestParam Long hubId, @RequestParam Long lotId) {
+        return ResponseEntity.ok(reservationService.getActiveReservationsForLot(hubId, lotId));
     }
 
     @PutMapping("/gate-a/scan")

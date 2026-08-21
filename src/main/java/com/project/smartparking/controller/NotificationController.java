@@ -24,13 +24,13 @@ public class NotificationController {
         return ResponseEntity.ok(notificationService.getUserNotifications(userId));
     }
 
-    @PreAuthorize("hasRole('ADMIN') or (hasRole('COMMUTER') and #userId == authentication.principal.id)")
+    @PreAuthorize("hasRole('ADMIN') or (hasRole('COMMUTER') and #userId == authentication.principal.userId)")
     @GetMapping("/user/{userId}")
     public ResponseEntity<List<Notification>> getUserNotifications(@PathVariable Long userId) {
         return ResponseEntity.ok(notificationService.getUserNotifications(userId));
     }
 
-    @PreAuthorize("hasRole('ADMIN') or (hasRole('COMMUTER') and #userId == authentication.principal.id)")
+    @PreAuthorize("hasRole('ADMIN') or (hasRole('COMMUTER') and #userId == authentication.principal.userId)")
     @GetMapping("/user/{userId}/unread")
     public ResponseEntity<List<Notification>> getUnread(@PathVariable Long userId) {
         return ResponseEntity.ok(notificationService.getUnreadNotifications(userId));

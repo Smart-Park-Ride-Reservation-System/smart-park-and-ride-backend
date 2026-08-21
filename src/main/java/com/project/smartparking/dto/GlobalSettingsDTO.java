@@ -19,6 +19,7 @@ public class GlobalSettingsDTO {
 
     // Pricing Settings
     private Double bikeHourlyRate;
+    private Double tukHourlyRate; // <--- Added missing field
     private Double carHourlyRate;
     private Double suvHourlyRate;
     private Double vanHourlyRate;

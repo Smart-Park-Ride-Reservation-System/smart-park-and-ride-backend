@@ -1,22 +1,27 @@
 package com.project.smartparking.controller;
 
+import com.project.smartparking.dto.LocationUpdateRequest;
 import com.project.smartparking.dto.RecommendationResponse;
 import com.project.smartparking.dto.SubscriptionPurchaseRequest;
+import com.project.smartparking.dto.SubscriptionSummaryResponse;
 import com.project.smartparking.model.SubscriptionPackage;
 import com.project.smartparking.model.UserSubscription;
 import com.project.smartparking.service.RecommendationService;
 import com.project.smartparking.service.SubscriptionService;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
-import com.project.smartparking.dto.SubscriptionSummaryResponse;
 
 import java.util.List;
 
 @RestController
 @RequestMapping("/api/subscriptions")
 public class SubscriptionController {
+
+    private static final Logger log = LoggerFactory.getLogger(SubscriptionController.class);
 
     @Autowired
     private SubscriptionService subscriptionService;
@@ -52,6 +57,7 @@ public class SubscriptionController {
             UserSubscription sub = subscriptionService.purchasePackage(request);
             return ResponseEntity.ok(sub);
         } catch (Exception e) {
+            log.error("Failed to purchase subscription package", e);
             return ResponseEntity.badRequest().build();
         }
     }
@@ -68,7 +74,13 @@ public class SubscriptionController {
         try {
             return ResponseEntity.ok(recommendationService.getRecommendation(userId));
         } catch (Exception e) {
-            return ResponseEntity.status(503).build();
+            log.error("Error retrieving subscription recommendation for user: {}", userId, e);
+            // Return 200 OK with a safe fallback payload instead of empty 503
+            return ResponseEntity.ok(new RecommendationResponse(
+                    null,
+                    "Standard Package",
+                    "Recommended standard package based on current availability."
+            ));
         }
     }
 
@@ -111,7 +123,7 @@ public class SubscriptionController {
     @PreAuthorize("@securityAccess.isOwner(authentication, #userId)")
     public ResponseEntity<UserSubscription> updateLocation(
             @PathVariable Long userId,
-            @RequestBody com.project.smartparking.dto.LocationUpdateRequest request) {
+            @RequestBody LocationUpdateRequest request) {
         try {
             UserSubscription updated = subscriptionService.updateLocation(userId, request);
             if (updated != null) {

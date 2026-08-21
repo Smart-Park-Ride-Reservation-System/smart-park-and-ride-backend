@@ -24,7 +24,6 @@ public class SensorSyncListener {
 
     private static final Logger log = LoggerFactory.getLogger(SensorSyncListener.class);
 
-    // Updated to use ReservationStatus enums instead of String literals
     private static final List<ReservationStatus> ACTIVE_RESERVATION_STATUSES = List.of(
             ReservationStatus.CONFIRMED,
             ReservationStatus.CHECKED_IN);
@@ -88,8 +87,7 @@ public class SensorSyncListener {
             if (occupied) {
                 newStatus = SlotStatus.OCCUPIED;
             } else {
-                // Compatible with the updated ReservationRepository signature:
-                // Collection<ReservationStatus>
+
                 List<Reservation> activeReservations = reservationRepo
                         .findBySlotSlotIdAndStatusIn(slot.getSlotId(), ACTIVE_RESERVATION_STATUSES);
 

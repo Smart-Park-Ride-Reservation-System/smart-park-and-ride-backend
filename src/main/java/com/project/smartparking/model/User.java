@@ -3,6 +3,7 @@ package com.project.smartparking.model;
 import jakarta.persistence.*;
 import lombok.*;
 import java.sql.Timestamp;
+import java.util.List;
 
 @Entity
 @Table(name = "users")
@@ -40,6 +41,11 @@ public class User {
 
     @Column(name = "created_at", nullable = false, updatable = false)
     private Timestamp createdAt;
+
+    @ElementCollection
+    @CollectionTable(name = "user_vehicles", joinColumns = @JoinColumn(name = "user_id"))
+    @Column(name = "vehicle_no")
+    private List<String> vehicles;
 
     @PrePersist
     protected void onCreate() {

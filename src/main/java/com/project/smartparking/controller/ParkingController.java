@@ -48,6 +48,35 @@ public class ParkingController {
     }
 
     /**
+     * Legacy endpoint to open/close entry or exit barriers manually (for UI compatibility).
+     * Example: POST /api/v1/parking/hubs/1/doors/in?action=open
+     */
+    @PostMapping("/hubs/{hubId}/doors/{doorType}")
+    public ResponseEntity<?> controlDoorLegacy(
+            @PathVariable int hubId,
+            @PathVariable String doorType,
+            @RequestParam(defaultValue = "open") String action) {
+
+        if (!doorType.equalsIgnoreCase("in") && !doorType.equalsIgnoreCase("out")) {
+            return ResponseEntity.badRequest().body(Map.of("error", "Door type must be 'in' or 'out'"));
+        }
+
+        try {
+            // Default to lotId 1 since legacy UI doesn't send it
+            parkingSlotService.controlDoor(hubId, 1, doorType, action).get();
+            return ResponseEntity.ok(Map.of(
+                    "status", "SUCCESS",
+                    "hubId", hubId,
+                    "lotId", 1,
+                    "door", doorType,
+                    "actionApplied", action));
+        } catch (InterruptedException | ExecutionException e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("error", "Failed to communicate with Firebase: " + e.getMessage()));
+        }
+    }
+
+    /**
      * Endpoint to check slot occupancy state.
      * Example: GET /api/v1/parking/hubs/1/lots/101/slots/A01
      */

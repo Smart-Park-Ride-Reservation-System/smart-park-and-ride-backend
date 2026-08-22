@@ -30,7 +30,7 @@ public class RecommendationService {
     @Value("${groq.api.key:}")
     private String groqApiKey;
 
-    private static final String GROQ_MODEL = "llama-3.1-8b-instant";
+    private static final String GROQ_MODEL = "llama3-8b-8192";
     private static final String GROQ_URL = "https://api.groq.com/openai/v1/chat/completions";
 
     private final RestTemplate restTemplate;

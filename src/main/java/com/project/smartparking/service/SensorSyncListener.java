@@ -13,7 +13,6 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.DependsOn;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 import java.util.HashMap;
@@ -35,6 +34,9 @@ public class SensorSyncListener {
 
     @Autowired
     private SlotStreamService slotStreamService;
+
+    @Autowired
+    private SensorActivityService activityService;
 
     public SensorSyncListener(ParkingSlotRepository slotRepo,
             ReservationRepository reservationRepo) {
@@ -103,8 +105,13 @@ public class SensorSyncListener {
     public void updateSlotStatusInDb(Long hubId, Long lotId, String slotCode, boolean occupied) {
         slotRepo.findByLot_LotIdAndSlotCode(lotId, slotCode).ifPresentOrElse(slot -> {
             if (slot.getStatus() == SlotStatus.OUT_OF_SERVICE) {
+                activityService.log("WARN",
+                        String.format("hub_%d/lot_%d/%s ping ignored — slot OUT_OF_SERVICE", hubId, lotId, slotCode));
                 return;
             }
+
+            activityService.log("INFO",
+                    String.format("hub_%d/lot_%d/%s occupied=%s", hubId, lotId, slotCode, occupied));
 
             SlotStatus newStatus;
 
@@ -122,6 +129,8 @@ public class SensorSyncListener {
                 slot.setStatus(newStatus);
                 slotRepo.save(slot);
                 log.info("Live Update: Slot {} (lot={}, hub={}) is now {}", slotCode, lotId, hubId, newStatus);
+                activityService.log("INFO",
+                        String.format("Slot %s status changed -> %s", slotCode, newStatus));
             }
 
             // Use hubId + lotId directly (already parsed from Firebase path) to
@@ -129,7 +138,11 @@ public class SensorSyncListener {
             slotStreamService.notifyLotChange(hubId, lotId);
             pushToFirebase(slot);
 
-        }, () -> log.warn("[SensorSync] No DB slot for hubId={} lotId={} slotCode={}", hubId, lotId, slotCode));
+        }, () -> {
+            log.warn("[SensorSync] No DB slot for hubId={} lotId={} slotCode={}", hubId, lotId, slotCode);
+            activityService.log("ERROR",
+                    String.format("No DB slot found for hub_%d/lot_%d/%s", hubId, lotId, slotCode));
+        });
     }
 
     private void pushToFirebase(ParkingSlot slot) {

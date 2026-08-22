@@ -1,6 +1,7 @@
 package com.project.smartparking.model;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.persistence.*;
 import lombok.*;
 import java.math.BigDecimal;
@@ -25,6 +26,10 @@ public class Payment {
     @JsonIgnore
     private Reservation reservation;
 
+    @JsonProperty("reservationId")
+    public Long getReservationId() {
+        return reservation != null ? reservation.getReservationId() : null;
+    }
 
     @Column(nullable = false, precision = 10, scale = 2)
     private BigDecimal amount;

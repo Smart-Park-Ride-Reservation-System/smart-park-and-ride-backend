@@ -185,7 +185,7 @@ public class NotificationBroadcastService {
                 if (req.getHubId() == null) {
                     throw new IllegalArgumentException("hubId is required when audience=HUB");
                 }
-                return userRepo.findByHub_HubIdAndRole(req.getHubId(), User.Role.ATTENDANT);
+                return userRepo.findByHubId(req.getHubId());
             case "SINGLE_USER":
                 if (req.getUserId() == null) {
                     throw new IllegalArgumentException("userId is required when audience=SINGLE_USER");
@@ -230,10 +230,10 @@ public class NotificationBroadcastService {
             case "SINGLE_USER":
                 User target = userRepo.findById(req.getUserId())
                         .orElseThrow(() -> new IllegalArgumentException("User not found: " + req.getUserId()));
-                if (target.getRole() != User.Role.ATTENDANT
+                if ((target.getRole() != User.Role.ATTENDANT && target.getRole() != User.Role.COMMUTER)
                         || target.getHub() == null
                         || !target.getHub().getHubId().equals(ownHubId)) {
-                    throw new AccessDeniedException("Hub admin can only message their own hub's attendants");
+                    throw new AccessDeniedException("Hub admin can only message their own hub's attendants and commuters");
                 }
                 break;
             default:

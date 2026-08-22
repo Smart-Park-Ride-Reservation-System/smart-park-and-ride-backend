@@ -99,8 +99,8 @@ public class SecurityConfig {
                                                 .requestMatchers(HttpMethod.GET, "/api/slots/search/**", "/api/v1/parking/**")
                                                 .permitAll()
                                                 // Allow anyone to subscribe to real-time SSE streams (EventSource doesn't support auth headers)
-                                                .requestMatchers(HttpMethod.GET, "/api/slots/stream",
-                                                                "/api/sensors/activity/stream")
+                                                .requestMatchers(HttpMethod.GET, "/api/slots/stream", "/api/slots/stream/",
+                                                                "/api/sensors/activity/stream", "/api/sensors/activity/stream/")
                                                 .permitAll()
                                                 // All other slot management endpoints are admin-only
                                                 .requestMatchers(HttpMethod.GET, "/api/slots", "/api/slots/**")
@@ -163,6 +163,10 @@ public class SecurityConfig {
 
                                                 // Admin global settings — ADMIN only (HUB_ADMIN cannot change system-wide config)
                                                 .requestMatchers("/api/admin/**")
+                                                .hasRole("ADMIN")
+                                                
+                                                // Sensors
+                                                .requestMatchers("/api/sensors", "/api/sensors/**")
                                                 .hasRole("ADMIN")
 
                                                 .anyRequest().authenticated())

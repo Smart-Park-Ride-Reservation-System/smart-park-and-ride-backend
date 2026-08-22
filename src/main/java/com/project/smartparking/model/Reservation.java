@@ -70,7 +70,7 @@ public class Reservation {
     @Column(name = "reminder_sent")
     private Boolean reminderSent = false;
 
-    @Column(name = "created_at", updatable = false)
+    @Column(name = "created_at")
     private LocalDateTime createdAt;
 
     @OneToMany(mappedBy = "reservation", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
@@ -78,9 +78,9 @@ public class Reservation {
 
     @PrePersist
     protected void onCreate() {
-        this.createdAt = LocalDateTime.now();
+        this.createdAt = java.time.ZonedDateTime.now(java.time.ZoneId.of("Asia/Colombo")).toLocalDateTime();
         if (this.bookingDate == null) {
-            this.bookingDate = LocalDateTime.now();
+            this.bookingDate = java.time.ZonedDateTime.now(java.time.ZoneId.of("Asia/Colombo")).toLocalDateTime();
         }
         if (this.status == null) {
             this.status = ReservationStatus.PENDING;

@@ -78,6 +78,12 @@ public class ReservationController {
         return ResponseEntity.ok("Deleted successfully");
     }
 
+    @PutMapping("/{id}/renew-hold")
+    @PreAuthorize("@securityAccess.canAccessReservation(authentication, #id)")
+    public ResponseEntity<?> renewHold(@PathVariable Long id) {
+        return ResponseEntity.ok(reservationService.renewHold(id));
+    }
+
     @PutMapping("/{id}/confirm-payment")
     @PreAuthorize("@securityAccess.canAccessReservation(authentication, #id)")
     public ResponseEntity<?> confirmPayment(@PathVariable Long id) {

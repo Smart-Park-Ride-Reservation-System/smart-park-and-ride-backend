@@ -85,8 +85,12 @@ public class ReservationService {
 
     @Transactional(readOnly = true)
     public List<Map<String, Object>> getActiveReservationsForLot(Long hubId, Long lotId) {
+        java.time.LocalDate today = getSriLankaNow().toLocalDate();
         return reservationRepo.findAll().stream()
-                .filter(r -> r.getStatus() == ReservationStatus.CHECKED_IN)
+                .filter(r -> r.getStatus() == ReservationStatus.CHECKED_IN || 
+                             (r.getStatus() == ReservationStatus.CONFIRMED && 
+                              r.getScheduledIn() != null && 
+                              r.getScheduledIn().toLocalDate().equals(today)))
                 .filter(r -> r.getSlot() != null
                         && r.getSlot().getLot() != null
                         && lotId.equals(r.getSlot().getLot().getLotId())
@@ -98,8 +102,31 @@ public class ReservationService {
                     m.put("slotCode", r.getSlot().getSlotCode());
                     m.put("vehicleNo", r.getVehicleNo());
                     m.put("ticketQrCode", r.getQrToken());
-                    m.put("entryTime", r.getActualIn() != null ? r.getActualIn().toString() : null);
+                    if (r.getActualIn() != null) {
+                        m.put("entryTime", r.getActualIn().toString());
+                    } else if (r.getScheduledIn() != null) {
+                        m.put("entryTime", r.getScheduledIn().toString() + " (Scheduled)");
+                    } else {
+                        m.put("entryTime", null);
+                    }
                     m.put("status", r.getStatus().name());
+                    
+                    // Calculate estimated fee
+                    if (r.getActualIn() != null) {
+                        // Store original actualOut
+                        LocalDateTime originalOut = r.getActualOut();
+                        try {
+                            r.setActualOut(getSriLankaNow());
+                            double estimatedFee = calculateParkingCharge(r);
+                            m.put("estimatedFee", estimatedFee);
+                        } finally {
+                            // Restore it to avoid modifying the entity unexpectedly (even though it's read-only)
+                            r.setActualOut(originalOut);
+                        }
+                    } else {
+                        m.put("estimatedFee", 0.0);
+                    }
+                    
                     return m;
                 })
                 .toList();
@@ -265,6 +292,16 @@ public class ReservationService {
         if (wasActive) {
             freeSlotIfNoActiveReservation(slotId);
         }
+    }
+
+    @Transactional
+    public synchronized Reservation renewHold(Long id) {
+        Reservation r = getById(id);
+        if (r.getStatus() != ReservationStatus.PENDING) {
+            throw new IllegalStateException("Only PENDING reservations can be renewed");
+        }
+        r.setCreatedAt(getSriLankaNow());
+        return reservationRepo.save(r);
     }
 
     @Transactional
@@ -617,3 +654,5 @@ public class ReservationService {
         slotRef.updateChildrenAsync(update);
     }
 }
+
+

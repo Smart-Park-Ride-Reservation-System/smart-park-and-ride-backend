@@ -54,7 +54,7 @@ public class AuthController {
 
         if (savedUser == null) {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                    .body("Signup failed");
+                    .body("Signup failed: Email or phone already in use or invalid data");
         }
 
         return ResponseEntity.status(HttpStatus.CREATED)

@@ -19,7 +19,7 @@ import com.project.smartparking.dto.SignupRequest;
 public class AuthService {
 
     @Autowired
-    private AuthRepository userRepository;
+    private AuthRepository authRepository;
 
     @Autowired
     private PasswordEncoder passwordEncoder;
@@ -34,7 +34,7 @@ public class AuthService {
     private String frontendBaseUrl;
 
     public User loginUser(String email, String password) {
-        Optional<User> userOpt = userRepository.findByEmail(email);
+        Optional<User> userOpt = authRepository.findByEmail(email);
         if (userOpt.isEmpty() || password == null) return null;
 
         User user = userOpt.get();
@@ -48,7 +48,7 @@ public class AuthService {
             return null;
         }
 
-        if (userRepository.findByEmail(request.getEmail()).isPresent()) {
+        if (authRepository.findByEmail(request.getEmail()).isPresent()) {
             return null;
         }
 
@@ -60,15 +60,15 @@ public class AuthService {
         newUser.setPassword(passwordEncoder.encode(request.getPassword()));
         newUser.setRole(User.Role.COMMUTER);
 
-        return userRepository.save(newUser);
+        return authRepository.save(newUser);
     }
 
     public User findUserByEmail(String email) {
-        return userRepository.findByEmail(email).orElse(null);
+        return authRepository.findByEmail(email).orElse(null);
     }
 
     public void initiatePasswordReset(String email) {
-        Optional<User> userOpt = userRepository.findByEmail(email);
+        Optional<User> userOpt = authRepository.findByEmail(email);
         if (userOpt.isEmpty()) {
             // Silently no-op so we don't reveal whether the email exists
             return;
@@ -79,7 +79,7 @@ public class AuthService {
 
         user.setResetToken(resetToken);
         user.setResetTokenExpiry(Timestamp.from(Instant.now().plus(1, ChronoUnit.HOURS)));
-        userRepository.save(user);
+        authRepository.save(user);
 
         String resetLink = frontendBaseUrl + "/reset-password?token=" + resetToken;
         String subject = "Reset your SmartParking password";
@@ -100,7 +100,7 @@ public class AuthService {
             return false;
         }
 
-        Optional<User> userOpt = userRepository.findByResetToken(token);
+        Optional<User> userOpt = authRepository.findByResetToken(token);
         if (userOpt.isEmpty()) {
             return false;
         }
@@ -115,7 +115,7 @@ public class AuthService {
         user.setPassword(passwordEncoder.encode(newPassword));
         user.setResetToken(null);
         user.setResetTokenExpiry(null);
-        userRepository.save(user);
+        authRepository.save(user);
 
         return true;
     }

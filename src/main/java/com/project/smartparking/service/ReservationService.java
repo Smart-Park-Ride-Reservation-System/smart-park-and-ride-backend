@@ -182,7 +182,7 @@ public class ReservationService {
 
         Reservation saved = reservationRepo.save(r);
 
-        slot.setStatus(ParkingSlot.SlotStatus.OCCUPIED);
+        slot.setStatus(ParkingSlot.SlotStatus.RESERVED);
         slotRepo.save(slot);
         slotStreamService.notifySlotUpdate(slot);
         syncSlotToFirebase(slot, false);
@@ -386,7 +386,7 @@ public class ReservationService {
         r.setStatus(ReservationStatus.CHECKED_IN);
 
         if (r.getSlot() != null && r.getSlot().getSlotId() != null) { slotRepo.findById(r.getSlot().getSlotId()).ifPresent(slot -> {
-            slot.setStatus(ParkingSlot.SlotStatus.OCCUPIED);
+            slot.setStatus(ParkingSlot.SlotStatus.RESERVED);
             slotRepo.save(slot);
             slotStreamService.notifySlotUpdate(slot);
             syncSlotToFirebase(slot, false);
@@ -433,7 +433,7 @@ public class ReservationService {
         r.setStatus(ReservationStatus.CHECKED_IN);
 
         if (r.getSlot() != null && r.getSlot().getSlotId() != null) { slotRepo.findById(r.getSlot().getSlotId()).ifPresent(slot -> {
-            slot.setStatus(ParkingSlot.SlotStatus.OCCUPIED);
+            slot.setStatus(ParkingSlot.SlotStatus.RESERVED);
             slotRepo.save(slot);
             slotStreamService.notifySlotUpdate(slot);
             syncSlotToFirebase(slot, false);

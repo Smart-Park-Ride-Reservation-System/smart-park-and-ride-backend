@@ -96,4 +96,20 @@ public class Reservation {
         EXPIRED,      // commuter no-show — passed grace period without check-in
         PAID          // fee settled (if you track payment separately from completion)
     }
+
+    @com.fasterxml.jackson.annotation.JsonProperty("userId")
+    public void setUserId(Long userId) {
+        if (userId != null) {
+            this.user = new User();
+            this.user.setUserId(userId);
+        }
+    }
+
+    @com.fasterxml.jackson.annotation.JsonProperty("slotId")
+    public void setSlotId(Long slotId) {
+        if (slotId != null) {
+            this.slot = new ParkingSlot();
+            this.slot.setSlotId(slotId);
+        }
+    }
 }

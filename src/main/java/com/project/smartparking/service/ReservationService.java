@@ -232,9 +232,13 @@ public class ReservationService {
         r.setSlot(slot);
         r.setStatus(ReservationStatus.PENDING);
 
+        // Fetch user record
+        com.project.smartparking.model.User u = userRepository.findById(r.getUser().getUserId())
+                .orElseThrow(() -> new IllegalArgumentException("Invalid userId"));
+        r.setUser(u);
+
         // Add vehicle to user's vehicle list if not present
         if (r.getVehicleNo() != null && !r.getVehicleNo().isBlank()) {
-            com.project.smartparking.model.User u = r.getUser();
             if (u.getVehicles() == null) {
                 u.setVehicles(new java.util.ArrayList<>());
             }

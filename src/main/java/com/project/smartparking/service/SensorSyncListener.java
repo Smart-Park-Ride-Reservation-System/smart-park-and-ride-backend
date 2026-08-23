@@ -27,7 +27,8 @@ public class SensorSyncListener {
 
     private static final List<ReservationStatus> ACTIVE_RESERVATION_STATUSES = List.of(
             ReservationStatus.CONFIRMED,
-            ReservationStatus.CHECKED_IN);
+            ReservationStatus.CHECKED_IN,
+            ReservationStatus.COMPLETED);
 
     private final ParkingSlotRepository slotRepo;
     private final ReservationRepository reservationRepo;
@@ -158,3 +159,4 @@ public class SensorSyncListener {
         slotRef.updateChildrenAsync(update);
     }
 }
+

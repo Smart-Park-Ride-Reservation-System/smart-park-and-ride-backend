@@ -355,7 +355,7 @@ public class ReservationService {
     public Reservation checkInByQrToken(String qrToken) {
         Reservation r = reservationRepo.findByQrToken(qrToken)
                 .orElseThrow(() -> new IllegalArgumentException("Invalid QR code"));
-        assertHubAccess(r.getSlot().getSlotId());
+        if (r.getSlot() != null) { assertHubAccess(r.getSlot().getSlotId()); }
         if (r.getStatus() != ReservationStatus.CONFIRMED) {
             throw new IllegalStateException("Not in valid state for check-in: " + r.getStatus());
         }
@@ -363,12 +363,12 @@ public class ReservationService {
         r.setActualIn(getSriLankaNow());
         r.setStatus(ReservationStatus.CHECKED_IN);
 
-        slotRepo.findById(r.getSlot().getSlotId()).ifPresent(slot -> {
+        if (r.getSlot() != null && r.getSlot().getSlotId() != null) { slotRepo.findById(r.getSlot().getSlotId()).ifPresent(slot -> {
             slot.setStatus(ParkingSlot.SlotStatus.OCCUPIED);
             slotRepo.save(slot);
             slotStreamService.notifySlotUpdate(slot);
             syncSlotToFirebase(slot, false);
-        });
+        }); }
 
         openGate(r, "in");
 
@@ -379,7 +379,7 @@ public class ReservationService {
     public Reservation checkOutByQrToken(String qrToken) {
         Reservation r = reservationRepo.findByQrToken(qrToken)
                 .orElseThrow(() -> new IllegalArgumentException("Invalid QR code"));
-        assertHubAccess(r.getSlot().getSlotId());
+        if (r.getSlot() != null) { assertHubAccess(r.getSlot().getSlotId()); }
         if (r.getStatus() != ReservationStatus.CHECKED_IN) {
             throw new IllegalStateException("Not in valid state for check-out: " + r.getStatus());
         }
@@ -387,12 +387,12 @@ public class ReservationService {
         r.setActualOut(getSriLankaNow());
         r.setStatus(ReservationStatus.COMPLETED);
 
-        slotRepo.findById(r.getSlot().getSlotId()).ifPresent(slot -> {
+        if (r.getSlot() != null && r.getSlot().getSlotId() != null) { slotRepo.findById(r.getSlot().getSlotId()).ifPresent(slot -> {
             slot.setStatus(ParkingSlot.SlotStatus.AVAILABLE);
             slotRepo.save(slot);
             slotStreamService.notifySlotUpdate(slot);
             syncSlotToFirebase(slot, false);
-        });
+        }); }
 
         openGate(r, "out");
 
@@ -402,7 +402,7 @@ public class ReservationService {
     @Transactional
     public Reservation checkInById(Long id) {
         Reservation r = getById(id);
-        assertHubAccess(r.getSlot().getSlotId());
+        if (r.getSlot() != null) { assertHubAccess(r.getSlot().getSlotId()); }
         if (r.getStatus() != ReservationStatus.CONFIRMED) {
             throw new IllegalStateException("Not in valid state for check-in: " + r.getStatus());
         }
@@ -410,12 +410,12 @@ public class ReservationService {
         r.setActualIn(getSriLankaNow());
         r.setStatus(ReservationStatus.CHECKED_IN);
 
-        slotRepo.findById(r.getSlot().getSlotId()).ifPresent(slot -> {
+        if (r.getSlot() != null && r.getSlot().getSlotId() != null) { slotRepo.findById(r.getSlot().getSlotId()).ifPresent(slot -> {
             slot.setStatus(ParkingSlot.SlotStatus.OCCUPIED);
             slotRepo.save(slot);
             slotStreamService.notifySlotUpdate(slot);
             syncSlotToFirebase(slot, false);
-        });
+        }); }
 
         openGate(r, "in");
 
@@ -425,7 +425,7 @@ public class ReservationService {
     @Transactional
     public Reservation checkOut(Long id) {
         Reservation r = getById(id);
-        assertHubAccess(r.getSlot().getSlotId());
+        if (r.getSlot() != null) { assertHubAccess(r.getSlot().getSlotId()); }
         if (r.getStatus() != ReservationStatus.CHECKED_IN) {
             throw new IllegalStateException("Not checked in");
         }
@@ -433,12 +433,12 @@ public class ReservationService {
         r.setActualOut(getSriLankaNow());
         r.setStatus(ReservationStatus.COMPLETED);
 
-        slotRepo.findById(r.getSlot().getSlotId()).ifPresent(slot -> {
+        if (r.getSlot() != null && r.getSlot().getSlotId() != null) { slotRepo.findById(r.getSlot().getSlotId()).ifPresent(slot -> {
             slot.setStatus(ParkingSlot.SlotStatus.AVAILABLE);
             slotRepo.save(slot);
             slotStreamService.notifySlotUpdate(slot);
             syncSlotToFirebase(slot, false);
-        });
+        }); }
 
         openGate(r, "out");
 
@@ -460,7 +460,7 @@ public class ReservationService {
     @Transactional
     public synchronized Reservation markPaid(Long id) {
         Reservation r = getById(id);
-        assertHubAccess(r.getSlot().getSlotId());
+        if (r.getSlot() != null) { assertHubAccess(r.getSlot().getSlotId()); }
 
         if (r.getStatus() != ReservationStatus.COMPLETED) {
             throw new IllegalStateException("Only COMPLETED reservations can be marked as paid");
@@ -484,6 +484,15 @@ public class ReservationService {
             paymentRepo.save(payment);
         }
 
+        if (r.getSlot() != null && r.getSlot().getSlotId() != null) {
+            slotRepo.findById(r.getSlot().getSlotId()).ifPresent(slot -> {
+                slot.setStatus(ParkingSlot.SlotStatus.AVAILABLE);
+                slotRepo.save(slot);
+                slotStreamService.notifySlotUpdate(slot);
+                syncSlotToFirebase(slot, false);
+            });
+        }
+        openGate(r, "out");
         r.setStatus(ReservationStatus.PAID);
         return reservationRepo.save(r);
     }
@@ -615,6 +624,10 @@ public class ReservationService {
     }
 
     private void openGate(Reservation r, String door) {
+        if (r.getSlot() == null || r.getSlot().getLot() == null || r.getSlot().getLot().getHub() == null) {
+            log.warn("Cannot open gate: missing slot/lot/hub for reservation {}", r.getReservationId());
+            return;
+        }
         Long hubId = r.getSlot().getLot().getHub().getHubId();
         Long lotId = r.getSlot().getLot().getLotId();
         String gatePath = "door/hubs/hub_" + hubId + "/lots/lot_" + lotId + "/" + door;
@@ -654,5 +667,6 @@ public class ReservationService {
         slotRef.updateChildrenAsync(update);
     }
 }
+
 
 

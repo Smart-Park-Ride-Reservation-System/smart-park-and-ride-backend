@@ -28,7 +28,7 @@ public class LoginTest {
     private static WebDriver driver;
     private static WebDriverWait wait;
 
-    private static final String BASE_URL  = "http://localhost:3000";
+    private static final String BASE_URL  = "https://smartpark-reservation-frontend.vercel.app";
     private static final String LOGIN_URL = BASE_URL + "/login";
 
     private static final String VALID_EMAIL    = "rehenu@gmail.com";
@@ -138,10 +138,10 @@ public class LoginTest {
         fillField(EMAIL_INPUT,    VALID_EMAIL);
         fillField(PASSWORD_INPUT, VALID_PASSWORD);
         waitFor(SIGN_IN_BUTTON).click();
-        wait.until(ExpectedConditions.urlToBe(BASE_URL + "/"));
-        assertEquals(BASE_URL + "/", driver.getCurrentUrl());
+        wait.until(ExpectedConditions.urlToBe(BASE_URL + "/dashboard/attendant"));
+        assertEquals(BASE_URL + "/dashboard/attendant", driver.getCurrentUrl());
         ((JavascriptExecutor) driver).executeScript("localStorage.removeItem('user');");
-        System.out.println("✔ TC06 PASSED – Commuter login redirected to '/'");
+        System.out.println("✔ TC06 PASSED – Commuter login redirected to '/dashboard/attendant'");
     }
 
     @Test
@@ -199,9 +199,9 @@ public class LoginTest {
         fillField(EMAIL_INPUT,    VALID_EMAIL);
         fillField(PASSWORD_INPUT, VALID_PASSWORD);
         waitFor(PASSWORD_INPUT).sendKeys(Keys.ENTER);
-        wait.until(ExpectedConditions.urlToBe(BASE_URL + "/"));
-        assertEquals(BASE_URL + "/", driver.getCurrentUrl());
+        wait.until(ExpectedConditions.urlToBe(BASE_URL + "/dashboard/attendant"));
+        assertEquals(BASE_URL + "/dashboard/attendant", driver.getCurrentUrl());
         ((JavascriptExecutor) driver).executeScript("localStorage.removeItem('user');");
-        System.out.println("✔ TC11 PASSED – Enter key submits form and redirects to '/'");
+        System.out.println("✔ TC11 PASSED – Enter key submits form and redirects to '/dashboard/attendant'");
     }
 }

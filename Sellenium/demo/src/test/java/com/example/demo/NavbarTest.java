@@ -37,7 +37,7 @@ class NavbarTest {
 
     // ── Config ────────────────────────────────────────────────────────────────
 
-    private static final String BASE_URL             = "http://localhost:3000";
+    private static final String BASE_URL             = "https://smartpark-reservation-frontend.vercel.app";
     private static final int    WAIT_TIMEOUT         = 10;
 
     private static final String NAV_SELECTOR         = "nav";

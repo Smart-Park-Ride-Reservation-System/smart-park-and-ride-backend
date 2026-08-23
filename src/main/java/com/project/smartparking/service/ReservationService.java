@@ -55,6 +55,8 @@ public class ReservationService {
     private ParkingLotRepository lotRepo;
     @Autowired
     private SlotStreamService slotStreamService;
+    @Autowired
+    private com.project.smartparking.repository.UserRepository userRepository;
 
     private LocalDateTime getSriLankaNow() {
         return ZonedDateTime.now(SRI_LANKA_ZONE).toLocalDateTime();
@@ -229,6 +231,22 @@ public class ReservationService {
 
         r.setSlot(slot);
         r.setStatus(ReservationStatus.PENDING);
+
+        // Add vehicle to user's vehicle list if not present
+        if (r.getVehicleNo() != null && !r.getVehicleNo().isBlank()) {
+            com.project.smartparking.model.User u = r.getUser();
+            if (u.getVehicles() == null) {
+                u.setVehicles(new java.util.ArrayList<>());
+            }
+            if (!u.getVehicles().contains(r.getVehicleNo())) {
+                u.getVehicles().add(r.getVehicleNo());
+                // Also save the hub as the user's preferred hub
+                if (u.getHub() == null || !u.getHub().getHubId().equals(slot.getLot().getHub().getHubId())) {
+                    u.setHub(slot.getLot().getHub());
+                }
+                userRepository.save(u);
+            }
+        }
         r.setCreatedAt(slNow); // Guarantee Sri Lanka creation time for holding logic
         r.setReservationFee(BigDecimal.valueOf(200.0));
 
@@ -667,6 +685,8 @@ public class ReservationService {
         slotRef.updateChildrenAsync(update);
     }
 }
+
+
 
 
 

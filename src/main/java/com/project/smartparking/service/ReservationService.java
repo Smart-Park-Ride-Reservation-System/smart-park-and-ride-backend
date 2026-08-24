@@ -473,8 +473,8 @@ public class ReservationService {
         Reservation r = getById(id);
         if (r.getSlot() != null) { assertHubAccess(r.getSlot().getSlotId()); }
 
-        if (r.getStatus() != ReservationStatus.COMPLETED) {
-            throw new IllegalStateException("Only COMPLETED reservations can be marked as paid");
+        if (r.getActualOut() == null) {
+            r.setActualOut(getSriLankaNow());
         }
 
         boolean durationChargeAlreadyPaid = paymentRepo.findByReservationReservationId(r.getReservationId())

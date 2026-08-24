@@ -91,7 +91,7 @@ public class ReservationController {
     }
 
     @PutMapping("/{id}/paid")
-    @PreAuthorize("hasAnyRole('ATTENDANT', 'HUB_ADMIN', 'ADMIN')")
+    @PreAuthorize("hasAnyRole('COMMUTER', 'ATTENDANT', 'HUB_ADMIN', 'ADMIN')")
     public ResponseEntity<?> markPaid(@PathVariable Long id) {
         return ResponseEntity.ok(reservationService.markPaid(id));
     }

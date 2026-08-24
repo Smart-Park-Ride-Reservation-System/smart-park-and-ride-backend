@@ -72,8 +72,9 @@ public class SecurityConfig {
                                                 .authenticationEntryPoint(new HttpStatusEntryPoint(
                                                                 HttpStatus.UNAUTHORIZED)))
                                 .authorizeHttpRequests(auth -> auth
-                                                // Public / Auth
-                                                .requestMatchers("/").permitAll()
+                                                // Public / Auth / Gate Scanners
+                                                .requestMatchers("/", "/gate", "/gate/**", "/gate/*").permitAll()
+                                                .requestMatchers("/api/reservations/gate/**", "/api/reservations/gate/*").permitAll()
                                                 .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                                                 .requestMatchers("/api/auth/**").permitAll()
                                                 .requestMatchers(HttpMethod.GET, "/api/home").permitAll()

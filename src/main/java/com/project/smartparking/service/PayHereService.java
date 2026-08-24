@@ -52,12 +52,10 @@ public class PayHereService {
         String secretHash = md5(merchantSecret).toUpperCase();
         String hash = md5(merchantId + orderId + amount + currency + secretHash).toUpperCase();
 
-        // Append reservationId for frontend redirection polling
         String returnUrlWithId = returnUrl
                 + (returnUrl.contains("?") ? "&" : "?")
                 + "reservationId=" + reservationId;
 
-        // Dynamically populate user details if available
         String firstName = (r.getUser() != null && r.getUser().getFirstName() != null)
                 ? r.getUser().getFirstName()
                 : "Customer";
@@ -112,7 +110,7 @@ public class PayHereService {
         Reservation r = reservationRepo.findById(reservationId)
                 .orElseThrow(() -> new RuntimeException("Reservation not found: " + reservationId));
 
-        if ("2".equals(statusCode)) { // Status 2 = PayHere Success
+        if ("2".equals(statusCode)) { 
 
             if (r.getStatus() == Reservation.ReservationStatus.PENDING) {
                 r.setReservationFee(new java.math.BigDecimal(amount));
@@ -120,7 +118,6 @@ public class PayHereService {
                 r.setQrToken(UUID.randomUUID().toString());
                 reservationRepo.save(r);
 
-                // Record the reservation fee payment
                 Payment payment = new Payment();
                 payment.setReservation(r);
                 payment.setAmount(BigDecimal.valueOf(Double.parseDouble(amount)));

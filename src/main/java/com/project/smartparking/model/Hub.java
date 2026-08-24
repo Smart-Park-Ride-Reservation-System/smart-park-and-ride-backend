@@ -36,7 +36,6 @@ public class Hub {
     @Column(name = "status", length = 30)
     private String status; 
 
-    // Connect Hub to its Parking Lots
     @OneToMany(mappedBy = "hub", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<ParkingLot> lots;
 }

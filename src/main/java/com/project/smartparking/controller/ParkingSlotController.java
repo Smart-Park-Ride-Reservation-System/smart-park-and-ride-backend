@@ -72,7 +72,7 @@ public class ParkingSlotController {
         return ResponseEntity.ok(slotService.updateStatus(id, slotStatus));
     }
 
-    // RESTRICTED: Only admins can generate grid structures
+    // Only admins can generate grid structures
     @PreAuthorize("hasRole('ADMIN')")
     @PostMapping("/generate")
     public ResponseEntity<Void> generateSlots(@RequestBody SlotGenerateRequest request) {
@@ -80,7 +80,7 @@ public class ParkingSlotController {
         return ResponseEntity.status(HttpStatus.CREATED).build();
     }
 
-    // RESTRICTED: Only admins can delete slots
+    // Only admins can delete slots
     @PreAuthorize("hasAnyRole('ADMIN')")
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deleteSlot(@PathVariable Long id) {

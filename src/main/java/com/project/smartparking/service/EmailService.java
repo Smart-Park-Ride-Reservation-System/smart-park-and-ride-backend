@@ -28,7 +28,6 @@ public class EmailService {
         }
     }
 
-    // New method: HTML booking confirmation with embedded QR code
     public void sendBookingConfirmation(String to, String slotId, String date, String time, String qrData) {
         try {
             MimeMessage message = mailSender.createMimeMessage();

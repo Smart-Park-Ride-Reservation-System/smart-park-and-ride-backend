@@ -10,15 +10,15 @@ public class ReservationResponse {
     private final Long reservationId;
     private final Long userId;
     private final Long slotId;
-    private final String slotCode; // Added: e.g. "A01"
-    private final String lotCode; // Added: e.g. "L1"
-    private final String hubName; // Added: e.g. "Central Hub"
+    private final String slotCode; 
+    private final String lotCode; 
+    private final String hubName; 
     private final String vehicleNo;
     private final String vehicleType;
     private final String status;
     private final LocalDateTime bookingDate;
     private final LocalDateTime scheduledIn;
-    private final LocalDateTime scheduledOut; // Added: missing scheduled end time
+    private final LocalDateTime scheduledOut; 
     private final LocalDateTime actualIn;
     private final LocalDateTime actualOut;
     private final String qrToken;
@@ -27,10 +27,8 @@ public class ReservationResponse {
     public ReservationResponse(Reservation r, BigDecimal amount) {
         this.reservationId = r.getReservationId();
 
-        // Safe navigation for User object
         this.userId = (r.getUser() != null) ? r.getUser().getUserId() : null;
 
-        // Safe navigation for Slot entity graph (Slot -> Lot -> Hub)
         if (r.getSlot() != null) {
             this.slotId = r.getSlot().getSlotId();
             this.slotCode = r.getSlot().getSlotCode();

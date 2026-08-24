@@ -43,6 +43,5 @@ public interface ParkingSlotRepository extends JpaRepository<ParkingSlot, Long> 
            "JOIN FETCH s.lot l " +
            "JOIN FETCH l.hub h")
     List<ParkingSlot> findAllWithLotAndHub();
-    // FIXED: Maps to ParkingSlot -> sensor -> sensorId
     Optional<ParkingSlot> findBySensor_SensorId(String sensorId);
 }

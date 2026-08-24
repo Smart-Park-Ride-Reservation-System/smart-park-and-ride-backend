@@ -75,7 +75,6 @@ public class SubscriptionController {
             return ResponseEntity.ok(recommendationService.getRecommendation(userId));
         } catch (Exception e) {
             log.error("Error retrieving subscription recommendation for user: {}", userId, e);
-            // Return 200 OK with a safe fallback payload instead of empty 503
             return ResponseEntity.ok(new RecommendationResponse(
                     null,
                     "Standard Package",

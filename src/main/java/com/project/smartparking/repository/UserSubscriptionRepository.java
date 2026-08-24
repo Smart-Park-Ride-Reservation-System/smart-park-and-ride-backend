@@ -25,7 +25,6 @@ public interface UserSubscriptionRepository extends JpaRepository<UserSubscripti
 
     Optional<UserSubscription> findFirstByUser_EmailAndStatusOrderByEndDateDesc(String email, String status);
 
-    // --- Custom JPQL Queries ---
     @Query("SELECT us FROM UserSubscription us " +
            "WHERE us.status = 'ACTIVE' AND us.endDate > :now")
     List<UserSubscription> findCurrentlyActive(@Param("now") Timestamp now);

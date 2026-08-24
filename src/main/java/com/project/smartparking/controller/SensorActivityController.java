@@ -25,8 +25,7 @@ public class SensorActivityController {
         return activityService.getHistory();
     }
 
-    // No @PreAuthorize here — SSE streams use EventSource which can't send Authorization headers.
-    // URL-level security is handled by SecurityConfig.permitAll() for this path.
+
     @GetMapping(value = "/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public SseEmitter stream() {
         return activityService.subscribe();

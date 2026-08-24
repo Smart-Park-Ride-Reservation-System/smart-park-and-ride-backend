@@ -53,7 +53,6 @@ public class SensorSyncListener {
             @Override
             public void onDataChange(DataSnapshot snapshot) {
                 for (DataSnapshot hubSnap : snapshot.getChildren()) {
-                    // Parse hubId from key e.g. "hub_1" → 1
                     String hubKey = hubSnap.getKey();
                     if (hubKey == null || !hubKey.startsWith("hub_")) continue;
                     Long hubId;
@@ -81,7 +80,6 @@ public class SensorSyncListener {
                                 Boolean occupied = slotSnap.child("occupied").getValue(Boolean.class);
 
                                 if (occupied != null && slotCode != null) {
-                                    // Pass hubId explicitly — avoids lazy-loading hub from slot entity
                                     updateSlotStatusInDb(hubId, lotId, slotCode, occupied);
                                 }
                             }
@@ -99,10 +97,7 @@ public class SensorSyncListener {
         log.info("[SensorSync] listening on /sensor/hubs for dynamic sensor updates");
     }
 
-    // NOTE: @Transactional is intentionally NOT used here.
-    // This method is called from a Firebase callback (inner class), which bypasses
-    // the Spring proxy — making @Transactional silently ineffective.
-    // Spring Data repository methods (find/save) each manage their own short transactions.
+   
     public void updateSlotStatusInDb(Long hubId, Long lotId, String slotCode, boolean occupied) {
         slotRepo.findByLot_LotIdAndSlotCode(lotId, slotCode).ifPresentOrElse(slot -> {
             if (slot.getStatus() == SlotStatus.OUT_OF_SERVICE) {
@@ -134,8 +129,7 @@ public class SensorSyncListener {
                         String.format("Slot %s status changed -> %s", slotCode, newStatus));
             }
 
-            // Use hubId + lotId directly (already parsed from Firebase path) to
-            // avoid lazy-loading slot.getLot().getHub() on a detached entity
+            
             slotStreamService.notifyLotChange(hubId, lotId);
             pushToFirebase(slot);
 

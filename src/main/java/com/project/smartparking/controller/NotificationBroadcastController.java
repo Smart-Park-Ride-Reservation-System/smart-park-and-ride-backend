@@ -91,13 +91,7 @@ public class NotificationBroadcastController {
         }
     }
 
-    // ── helpers ────────────────────────────────────────────────────────────────
 
-    /**
-     * Load the full User entity from DB using the JWT AuthenticatedUser.
-     * NotificationBroadcastService methods require a User entity (not AuthenticatedUser record)
-     * because they inspect hub assignment and role directly on the model.
-     */
     private User resolveUser(Authentication authentication) {
         AuthenticatedUser principal = (AuthenticatedUser) authentication.getPrincipal();
         return userRepository.findById(principal.userId())

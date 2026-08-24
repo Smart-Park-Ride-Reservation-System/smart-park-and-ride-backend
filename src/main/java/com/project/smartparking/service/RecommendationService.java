@@ -49,13 +49,11 @@ public class RecommendationService {
     public RecommendationResponse getRecommendation(Long userId) {
         List<SubscriptionPackage> packages = packageRepository.findByActiveTrue();
 
-        // 1. Guard against empty active packages without throwing an unhandled exception
         if (packages.isEmpty()) {
             log.warn("No active subscription packages found in DB for recommendation.");
             return new RecommendationResponse(null, "Standard Package", "No active packages currently available.");
         }
 
-        // 2. Guard against missing or placeholders in Groq API Key
         if (groqApiKey == null || groqApiKey.isBlank() || groqApiKey.startsWith("${")) {
             log.warn("Groq API key is missing or unconfigured. Falling back to default package.");
             return fallback(packages);

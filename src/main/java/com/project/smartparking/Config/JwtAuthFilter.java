@@ -32,7 +32,6 @@ public class JwtAuthFilter extends OncePerRequestFilter {
 
         String authHeader = request.getHeader("Authorization");
 
-        // 1. If missing or not Bearer, proceed as unauthenticated
         if (authHeader == null || !authHeader.startsWith("Bearer ")) {
             filterChain.doFilter(request, response);
             return;
@@ -40,7 +39,6 @@ public class JwtAuthFilter extends OncePerRequestFilter {
 
         String token = authHeader.substring(7).trim();
 
-        // 2. Ignore invalid string values passed by frontend
         if (token.isEmpty() || "undefined".equalsIgnoreCase(token) || "null".equalsIgnoreCase(token)) {
             filterChain.doFilter(request, response);
             return;
@@ -53,13 +51,10 @@ public class JwtAuthFilter extends OncePerRequestFilter {
                 Long userId = jwtService.extractUserId(token);
                 Long hubId = jwtService.extractHubId(token);
 
-                // Ensure non-null clean role string
                 String cleanRole = (rawRole != null && !rawRole.isBlank()) ? rawRole.trim() : "COMMUTER";
                 
-                // Strip "ROLE_" prefix for store consistency in principal if needed
                 String normalizedRole = cleanRole.startsWith("ROLE_") ? cleanRole.substring(5) : cleanRole;
                 
-                // Standard authority string MUST retain "ROLE_" prefix for Spring Security hasRole()
                 String authorityName = cleanRole.startsWith("ROLE_") ? cleanRole : "ROLE_" + cleanRole;
 
                 AuthenticatedUser principal = new AuthenticatedUser(email, userId, hubId, normalizedRole);
@@ -73,7 +68,7 @@ public class JwtAuthFilter extends OncePerRequestFilter {
             }
         } catch (Exception e) {
             logger.warn("JWT validation failed: " + e.getMessage());
-            SecurityContextHolder.clearContext(); // Explicitly clear unauthenticated context on error
+            SecurityContextHolder.clearContext(); 
         }
 
         filterChain.doFilter(request, response);

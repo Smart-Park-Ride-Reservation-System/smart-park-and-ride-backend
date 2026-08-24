@@ -21,19 +21,17 @@ public class ReminderScheduler {
     @Autowired
     private NotificationService notificationService;
 
-    @Scheduled(fixedRate = 60000) // Runs every 60 seconds
+    @Scheduled(fixedRate = 60000) 
     @Transactional
     public void sendReminders() {
         LocalDateTime now = LocalDateTime.now();
-        // Safe check window: Find any upcoming booking starting within the next 15 minutes 
-        // that hasn't received a reminder yet
+        
         LocalDateTime reminderThreshold = now.plusMinutes(15);
 
         List<Reservation> upcoming = reservationRepo
                 .findByScheduledInLessThanEqualAndReminderSentFalse(reminderThreshold);
 
         for (Reservation r : upcoming) {
-            // Null check to prevent NullPointerException
             if (r.getUser() == null || r.getUser().getUserId() == null) {
                 continue;
             }
@@ -61,7 +59,6 @@ public class ReminderScheduler {
                 r.setReminderSent(true);
                 reservationRepo.save(r);
             } catch (Exception e) {
-                // Log error without breaking the loop for remaining users
                 System.err.println("Failed to send reminder for reservation ID: " + r.getReservationId() + " - " + e.getMessage());
             }
         }

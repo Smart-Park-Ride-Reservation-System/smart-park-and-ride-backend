@@ -68,7 +68,6 @@ public class HubService {
         hubRepository.deleteById(id);
     }
 
-    // ===================== PUBLIC HOME PAGE =====================
 
     public List<HubSummaryDto> getActiveHubSummaries() {
     List<Hub> activeHubs = hubRepository.findByStatusIgnoreCase("ACTIVE");
@@ -94,7 +93,6 @@ public class HubService {
                 .map(ParkingLot::getLotId)
                 .collect(Collectors.toSet());
 
-        // Fixed: Replaced slot.getLotId() with slot.getLot().getLotId()
       int availableSlots = parkingSlotRepository.countAvailableByHub(hub.getHubId());
 
         return HubSummaryDto.builder()

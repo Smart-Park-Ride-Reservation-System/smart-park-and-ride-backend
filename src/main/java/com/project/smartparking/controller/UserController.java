@@ -29,7 +29,7 @@ public class UserController {
     @Autowired
     private PasswordEncoder passwordEncoder;
 
-    // GET CURRENT USER PROFILE — any authenticated user, viewing their own record
+    // GET CURRENT USER PROFILE 
     @PreAuthorize("isAuthenticated()")
     @GetMapping("/me")
     public ResponseEntity<User> getCurrentUser() {
@@ -42,7 +42,7 @@ public class UserController {
         return ResponseEntity.ok(user);
     }
 
-    // UPDATE CURRENT USER PROFILE — any authenticated user, editing their own record
+    // UPDATE CURRENT USER PROFILE 
     @PreAuthorize("isAuthenticated()")
     @PatchMapping("/me")
     public ResponseEntity<User> updateCurrentUser(@RequestBody UserCreateUpdateRequest request) {
@@ -69,14 +69,14 @@ public class UserController {
         return ResponseEntity.ok(updatedUser);
     }
 
-    // GET ALL USERS — matches config: GET /api/users/** -> ADMIN, HUB_ADMIN
+    // GET ALL USERS 
     @PreAuthorize("hasAnyRole('ADMIN', 'HUB_ADMIN')")
     @GetMapping
     public List<User> getAllUsers() {
         return repo.findAll();
     }
 
-    // CREATE USER — matches config: non-GET /api/users/** -> ADMIN only
+    // CREATE USER — 
     @PreAuthorize("hasRole('ADMIN')")
     @PostMapping
     public User createUser(@RequestBody UserCreateUpdateRequest request) {
@@ -106,7 +106,7 @@ public class UserController {
         repo.deleteById(id);
     }
 
-    // UPDATE USER BY ID (ADMIN USE) — ADMIN only
+    // UPDATE USER BY ID  — ADMIN only
     @PreAuthorize("hasRole('ADMIN')")
     @PatchMapping("/{id}")
     public User updateUser(

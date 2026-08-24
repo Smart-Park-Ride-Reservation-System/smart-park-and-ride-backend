@@ -86,7 +86,6 @@ public class SecurityConfig {
                                                 .requestMatchers("/api/payments/**")
                                                 .hasAnyRole("ADMIN", "HUB_ADMIN", "ATTENDANT")
 
-                                                // Subscription Public Packages vs Protected User Operations
                                                 .requestMatchers(HttpMethod.GET, "/api/subscriptions/packages",
                                                                 "/api/subscriptions/packages/**")
                                                 .permitAll()
@@ -98,11 +97,9 @@ public class SecurityConfig {
                                                 .hasAnyRole("COMMUTER", "ADMIN", "HUB_ADMIN", "ATTENDANT")
                                                 .requestMatchers(HttpMethod.GET, "/api/slots/search/**", "/api/v1/parking/**")
                                                 .permitAll()
-                                                // Allow anyone to subscribe to real-time SSE streams (EventSource doesn't support auth headers)
                                                 .requestMatchers(HttpMethod.GET, "/api/slots/stream", "/api/slots/stream/",
                                                                 "/api/sensors/activity/stream", "/api/sensors/activity/stream/")
                                                 .permitAll()
-                                                // All other slot management endpoints are admin-only
                                                 .requestMatchers(HttpMethod.GET, "/api/slots", "/api/slots/**")
                                                 .hasAnyRole("ADMIN", "HUB_ADMIN", "ATTENDANT")
                                                 .requestMatchers(HttpMethod.POST, "/api/slots/generate")
@@ -126,7 +123,6 @@ public class SecurityConfig {
                                                 .hasAnyRole("ATTENDANT", "HUB_ADMIN", "ADMIN")
                                                 .requestMatchers(HttpMethod.DELETE, "/api/reservations/**")
                                                 .hasRole("ADMIN")
-                                                // Fix: /api/reservations without trailing slash was not matched by /api/reservations/**
                                                 .requestMatchers("/api/reservations", "/api/reservations/**")
                                                 .hasAnyRole("COMMUTER", "ATTENDANT", "HUB_ADMIN", "ADMIN")
 
@@ -157,11 +153,9 @@ public class SecurityConfig {
                                                 .requestMatchers("/api/user-notifications/**")
                                                 .hasAnyRole("COMMUTER", "ATTENDANT", "HUB_ADMIN", "ADMIN")
 
-                                                // Notification Broadcasts — ADMIN sends to all, HUB_ADMIN to own hub
                                                 .requestMatchers("/api/notifications/broadcasts/**")
                                                 .hasAnyRole("ADMIN", "HUB_ADMIN")
 
-                                                // Admin global settings — ADMIN only (HUB_ADMIN cannot change system-wide config)
                                                 .requestMatchers("/api/admin/**")
                                                 .hasRole("ADMIN")
                                                 

@@ -43,7 +43,6 @@ public class ParkingSlotService {
     @Autowired
     private ReservationRepository reservationRepo;
 
-    // ── Firebase Path Helpers (Hierarchical Multi-Hub/Multi-Lot Structure) ────
 
     private DatabaseReference getSensorNodeRef(Long hubId, Long lotId) {
         return FirebaseDatabase.getInstance()

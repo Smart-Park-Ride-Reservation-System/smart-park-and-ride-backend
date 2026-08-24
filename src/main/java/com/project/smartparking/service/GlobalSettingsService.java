@@ -66,7 +66,6 @@ public class GlobalSettingsService {
         if (optionalSettings.isPresent()) {
             return optionalSettings.get();
         } else {
-            // Provide sensible defaults if not exists
             GlobalSettings settings = GlobalSettings.builder()
                     .id(1L)
                     .defaultTimezone("Asia/Colombo (IST)")

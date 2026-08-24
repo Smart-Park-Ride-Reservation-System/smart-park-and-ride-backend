@@ -14,6 +14,12 @@ public class DashboardController {
         return ResponseEntity.ok("ADMIN DASHBOARD");
     }
 
+    @GetMapping("/hub-admin")
+    @PreAuthorize("hasRole('HUB_ADMIN')")
+    public ResponseEntity<String> hubAdminDashboard() {
+        return ResponseEntity.ok("HUB ADMIN DASHBOARD");
+    }
+
     @GetMapping("/attendant")
     @PreAuthorize("hasRole('ATTENDANT')")
     public ResponseEntity<String> attendantDashboard() {

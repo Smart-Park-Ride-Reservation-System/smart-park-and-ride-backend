@@ -64,7 +64,6 @@ public class NotificationService {
             notifications.add(notification);
         }
 
-        // Batch save to improve performance
         List<Notification> savedNotifications = notificationRepo.saveAll(notifications);
 
         if (sendEmail) {

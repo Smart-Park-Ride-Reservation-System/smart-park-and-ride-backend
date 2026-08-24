@@ -70,7 +70,6 @@ public class AuthService {
     public void initiatePasswordReset(String email) {
         Optional<User> userOpt = authRepository.findByEmail(email);
         if (userOpt.isEmpty()) {
-            // Silently no-op so we don't reveal whether the email exists
             return;
         }
 
@@ -91,10 +90,7 @@ public class AuthService {
         emailService.send(user.getEmail(), subject, body);
     }
 
-    /**
-     * Returns true if the password was reset successfully, false if the token
-     * is invalid or expired.
-     */
+   
     public boolean resetPassword(String token, String newPassword) {
         if (token == null || token.isBlank() || newPassword == null || newPassword.isBlank()) {
             return false;

@@ -18,10 +18,7 @@ public class ParkingController {
         this.parkingSlotService = parkingSlotService;
     }
 
-    /**
-     * Endpoint to open/close entry or exit barriers manually.
-     * Example: POST /api/v1/parking/hubs/1/lots/101/doors/in?action=open
-     */
+
     @PostMapping("/hubs/{hubId}/lots/{lotId}/doors/{doorType}")
     public ResponseEntity<?> controlDoor(
             @PathVariable int hubId,
@@ -47,10 +44,6 @@ public class ParkingController {
         }
     }
 
-    /**
-     * Legacy endpoint to open/close entry or exit barriers manually (for UI compatibility).
-     * Example: POST /api/v1/parking/hubs/1/doors/in?action=open
-     */
     @PostMapping("/hubs/{hubId}/doors/{doorType}")
     public ResponseEntity<?> controlDoorLegacy(
             @PathVariable int hubId,
@@ -76,10 +69,7 @@ public class ParkingController {
         }
     }
 
-    /**
-     * Endpoint to check slot occupancy state.
-     * Example: GET /api/v1/parking/hubs/1/lots/101/slots/A01
-     */
+   
     @GetMapping("/hubs/{hubId}/lots/{lotId}/slots/{slotCode}")
     public ResponseEntity<?> getSlotState(
             @PathVariable int hubId,

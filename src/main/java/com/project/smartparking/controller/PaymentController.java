@@ -22,7 +22,6 @@ public class PaymentController {
     @PreAuthorize("hasAnyRole('ADMIN', 'HUB_ADMIN', 'ATTENDANT')")
     public ResponseEntity<?> getAll(Authentication authentication) {
         AuthenticatedUser principal = (AuthenticatedUser) authentication.getPrincipal();
-        // HUB_ADMIN only sees payments for their assigned hub
         if ("HUB_ADMIN".equals(principal.role())) {
             if (principal.hubId() == null) {
                 return ResponseEntity.status(403).body("Hub admin has no assigned hub");
@@ -66,7 +65,6 @@ public class PaymentController {
     @PreAuthorize("hasAnyRole('ATTENDANT', 'HUB_ADMIN', 'ADMIN')")
     public ResponseEntity<?> getRevenueSummary(Authentication authentication) {
         AuthenticatedUser principal = (AuthenticatedUser) authentication.getPrincipal();
-        // HUB_ADMIN only sees revenue for their hub
         if ("HUB_ADMIN".equals(principal.role())) {
             if (principal.hubId() == null) {
                 return ResponseEntity.status(403).body("Hub admin has no assigned hub");

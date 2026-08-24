@@ -38,7 +38,6 @@ import java.util.UUID;
 @Service
 public class ReservationService {
 
-    // Sri Lanka TimeZone Standard
     private static final ZoneId SRI_LANKA_ZONE = ZoneId.of("Asia/Colombo");
 
     @Autowired
@@ -113,16 +112,13 @@ public class ReservationService {
                     }
                     m.put("status", r.getStatus().name());
                     
-                    // Calculate estimated fee
                     if (r.getActualIn() != null) {
-                        // Store original actualOut
                         LocalDateTime originalOut = r.getActualOut();
                         try {
                             r.setActualOut(getSriLankaNow());
                             double estimatedFee = calculateParkingCharge(r);
                             m.put("estimatedFee", estimatedFee);
                         } finally {
-                            // Restore it to avoid modifying the entity unexpectedly (even though it's read-only)
                             r.setActualOut(originalOut);
                         }
                     } else {
@@ -209,14 +205,11 @@ public class ReservationService {
 
         LocalDateTime slNow = getSriLankaNow();
 
-        // FIX 1: Set 5-minute soft-lock threshold for PENDING checkout entries to
-        // prevent simultaneous bookings
+       
         LocalDateTime pendingCutoff = slNow.minusMinutes(5);
 
-        // 15-minute no-show cutoff window
         LocalDateTime noShowCutoff = slNow.minusMinutes(15);
 
-        // FIX 2: Prevent concurrent bookings for the same time window
         List<Long> conflictingSlots = reservationRepo.findReservedSlotIdsInWindow(
                 slot.getLot().getHub().getHubId(),
                 r.getScheduledIn(),
@@ -237,25 +230,22 @@ public class ReservationService {
                 .orElseThrow(() -> new IllegalArgumentException("Invalid userId"));
         r.setUser(u);
 
-        // Add vehicle to user's vehicle list if not present
         if (r.getVehicleNo() != null && !r.getVehicleNo().isBlank()) {
             if (u.getVehicles() == null) {
                 u.setVehicles(new java.util.ArrayList<>());
             }
             if (!u.getVehicles().contains(r.getVehicleNo())) {
                 u.getVehicles().add(r.getVehicleNo());
-                // Also save the hub as the user's preferred hub
                 if (u.getHub() == null || !u.getHub().getHubId().equals(slot.getLot().getHub().getHubId())) {
                     u.setHub(slot.getLot().getHub());
                 }
                 userRepository.save(u);
             }
         }
-        r.setCreatedAt(slNow); // Guarantee Sri Lanka creation time for holding logic
+        r.setCreatedAt(slNow); 
         r.setReservationFee(BigDecimal.valueOf(200.0));
 
-        // FIX 3: Prevent marking real-time slot as RESERVED when booking for future
-        // dates (e.g. 23rd at 10 AM)
+       
         boolean isImmediateBooking = !r.getScheduledIn().isAfter(slNow.plusMinutes(15));
 
         if (isImmediateBooking && slot.getStatus() == ParkingSlot.SlotStatus.AVAILABLE) {
@@ -330,7 +320,6 @@ public class ReservationService {
     public synchronized Reservation confirmPayment(Long id) {
         Reservation r = getById(id);
 
-        // Explicitly expire stale PENDING reservations upon payment attempt
         if (r.getStatus() == ReservationStatus.PENDING
                 && r.getCreatedAt().isBefore(getSriLankaNow().minusMinutes(5))) {
             expire(r);
@@ -659,7 +648,6 @@ public class ReservationService {
     }
 
     public void openGateManually(Long hubId, Long lotId, String door) {
-        // Enforce hub admin boundaries
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
         if (auth != null && auth.getPrincipal() instanceof AuthenticatedUser current) {
             if ("HUB_ADMIN".equals(current.role()) && !hubId.equals(current.hubId())) {

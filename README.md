@@ -1,166 +1,148 @@
-# Smart Park & Ride Reservation System
+# Smart Park & Ride Reservation System for Integrated Transport Hubs
 
-**A smart parking reservation prototype for integrated transport hubs in Sri Lanka.**
+A full-stack Smart Park & Ride prototype designed to support digital parking management at integrated transport hubs in Sri Lanka, using the Makumbura Multimodal Transport Centre (MMTC) as the reference context.
 
-A full-stack final-year project developed at the University of Moratuwa to support parking management, advance reservations, QR-based access and IoT-assisted parking occupancy monitoring, using the Makumbura Multimodal Transport Centre (MMTC) as the reference context.
-
-## Table of Contents
-
-- [Overview](#overview)
-- [Features](#features)
-- [Technology Stack](#technology-stack)
-- [System Architecture](#system-architecture)
-- [Testing](#testing)
-- [Challenges and Lessons Learned](#challenges-and-lessons-learned)
-- [Getting Started](#getting-started)
-- [Project Information](#project-information)
-- [Author](#author)
+This project was developed as an individual final-year project for the Bachelor of Information Technology (External) degree at the University of Moratuwa, Sri Lanka.
 
 ## Overview
 
-The Smart Park & Ride Reservation System provides a web-based approach to managing parking facilities at integrated transport hubs. It connects commuters, parking operations and supporting IoT components through a central application.
+Traditional parking management can make it difficult for commuters to identify available parking spaces, reserve them in advance and transition conveniently to public transport.
 
-The backend provides REST APIs and business logic for authentication, parking-slot management, reservations, QR workflows and integration with external services.
+The Smart Park & Ride Reservation System addresses this problem through a web-based platform that brings together parking-slot management, reservations, QR-based access, payment workflows and IoT-based occupancy monitoring.
 
-## Features
+The backend provides REST APIs and business logic to support the web application, reservation lifecycle, authentication, parking management and integration with external services.
 
-- **Authentication and authorisation** — JWT-based authentication and role-based access for commuters, attendants and administrators.
-- **Parking management** — Organised management of transport hubs, parking lots and parking slots.
-- **Online reservations** — View slot availability and reserve parking spaces in advance.
-- **QR-based access** — Support reservation verification and parking check-in/check-out workflows.
-- **Payment workflow** — PayHere integration within the prototype reservation process.
-- **Subscription management** — Support recurring parking plans and validity periods.
-- **Real-time updates** — Firebase Realtime Database and Server-Sent Events (SSE) for parking-slot synchronisation.
-- **AI-assisted analytics** — Groq API integration for parking analytics.
-- **IoT integration** — ESP32-based hardware and infrared sensors for parking-occupancy monitoring.
-- **Reservation lifecycle management** — Scheduled processes for handling reservation expiry and unused reservations.
+## Key Features
+
+- **User authentication and role-based access:** JWT-based authentication for commuters, attendants and administrators.
+- **Parking management:** Manage transport hubs, parking lots and individual parking slots.
+- **Reservations:** View slot availability and make parking reservations in advance.
+- **QR-based access:** Generate reservation QR codes and support check-in and check-out workflows.
+- **Payment workflow:** Integrate the PayHere payment gateway into the prototype reservation process.
+- **Subscription management:** Support subscription plans and validity periods for recurring parking users.
+- **Administrative dashboard:** Support parking operations, reservation monitoring and revenue-related information.
+- **Real-time synchronisation:** Use Firebase Realtime Database and Server-Sent Events (SSE) to communicate parking-slot updates.
+- **AI-assisted analytics:** Integrate the Groq API for AI-assisted parking analytics.
+- **IoT integration:** Connect the software architecture with ESP32-based hardware and infrared sensors for parking-occupancy monitoring.
 
 ## Technology Stack
 
-| Area | Technologies |
+| Component | Technologies |
 |---|---|
 | Backend | Java 21, Spring Boot 3.4.4 |
-| API | REST |
+| API | REST APIs |
 | Security | Spring Security, JWT |
 | Database | MySQL |
-| Real-time synchronisation | Firebase Realtime Database, SSE |
+| Real-time data | Firebase Realtime Database, SSE |
 | AI integration | Groq API |
-| Frontend | Next.js, React, Tailwind CSS |
-| Automated UI testing | Selenium WebDriver, Python, pytest |
 | Hardware | ESP32, infrared sensors, servo motor |
-| Deployment | Vercel (frontend), Railway (backend hosting used during development) |
+| Frontend | Next.js, React, Tailwind CSS |
+| UI testing | Selenium WebDriver, Python, pytest |
 | Version control | Git, GitHub |
+| Deployment | Vercel for the frontend; Railway was used for backend hosting |
 
 ## System Architecture
+<img width="556" height="440" alt="image" src="https://github.com/user-attachments/assets/4dc3e959-6437-429c-8c6b-34d6eb44e40a" />
 
-```mermaid
-<img width="556" height="440" alt="image" src="https://github.com/user-attachments/assets/032158c3-538a-4b88-86a5-12c7058cd8c3" />
 
-```
+MySQL manages the application's relational data, while Firebase supports real-time parking-slot data synchronisation. The system was designed to coordinate the web application, backend services, database, external integrations and hardware components.
 
-The system combines a relational database for core application data with Firebase for real-time parking-slot synchronisation. The backend also integrates with external services and IoT components as part of the prototype architecture.
+## Main Modules
 
-## Testing
+### 1. User Management
+- User registration and login.
+- JWT-based authentication.
+- Role-based access for commuters, attendants and administrators.
 
-The project used both manual testing and automated UI testing.
+### 2. Parking and Slot Management
+- Organise transport hubs, parking lots and parking slots.
+- Display slot availability through the web application.
+- Support occupancy updates through the system's real-time and IoT integration.
 
-### Manual Testing
+### 3. Reservation Management
+- Select an available parking slot and reservation time.
+- Create and manage parking reservations.
+- Generate reservation QR codes.
+- Handle incomplete reservations and reservation expiry through scheduled background processes.
 
-Manual checks covered:
+### 4. QR Check-In and Check-Out
+- Validate reservation QR codes through the application's access workflow.
+- Support recording parking entry and exit.
+- Update the associated parking-slot state.
 
-- Navigation and page accessibility
-- Registration and login validation
-- Parking-slot display and reservation workflows
-- QR check-in and check-out workflows
-- Responsive navigation at a 390-pixel mobile viewport
+### 5. Payment and Subscriptions
+- Integrate the PayHere payment workflow into the prototype.
+- Provide a payment-completion countdown for temporary reservation holds.
+- Support subscription plans and validity periods for recurring parking users.
 
-### Automated UI Testing
+### 6. Administration and Analytics
+- Provide administrative parking and reservation management.
+- Support monitoring of reservations and revenue-related information.
+- Integrate AI-assisted analytics using the Groq API.
 
-- **Framework:** Selenium WebDriver
-- **Language:** Python
-- **Test runner:** pytest
-- **Coverage areas:** Navigation, authentication and related web-interface interactions
+## Database Design
 
-Testing helped identify and address issues involving mobile navigation, authentication-token handling, reservation expiry and synchronisation between the database and sensor-related data.
+The MySQL database contains eight related tables organised around the system's transport-hub, parking-lot, parking-slot, reservation and supporting application data.
+
+The design includes relationships between parking slots and their associated sensors, as well as reservation records used to manage the booking lifecycle.
+
+## Testing and Evaluation
+
+Testing combined manual functional testing with automated UI testing to assess application behaviour and usability.
+
+**Manual testing**
+- Navigation and page accessibility.
+- Registration and login validation.
+- Reservation and slot-display workflows.
+- QR check-in and check-out workflows.
+- Responsive navigation at a 390-pixel mobile viewport.
+
+**Automated UI testing**
+- Selenium WebDriver with Python and pytest.
+- Five test classes covering different areas of the web interface.
+- Repeatable checks for navigation, authentication and related user interactions.
+
+Testing also helped identify integration challenges involving authentication-token handling, reservation expiry, sensor-to-database synchronisation and mobile navigation.
 
 ## Challenges and Lessons Learned
 
-Key technical challenges included:
+Developing the system highlighted the challenges of integrating independently operating components into one application.
 
-- Integrating the frontend, Spring Boot backend and external services.
-- Coordinating MySQL data with Firebase real-time updates.
+Key lessons included:
+
+- Designing and connecting REST APIs across frontend and backend services.
+- Coordinating relational database state with Firebase real-time data.
 - Handling authentication-token expiry and renewal.
 - Managing reservation timeouts and automatic cancellation.
-- Integrating physical sensor readings with application state.
-- Using automated tests to identify usability and navigation issues.
+- Testing hardware, backend and frontend interactions together.
+- Improving responsive navigation based on automated test findings.
 
 These challenges reinforced the importance of incremental integration, consistent state management and testing throughout development.
 
-## Getting Started
+## Future Improvements
 
-### Prerequisites
+Potential improvements include:
 
-- Java Development Kit (JDK) 21
-- Maven, or the project's Maven Wrapper if available
-- MySQL Server
-- Git
-
-### 1. Clone the repository
-
-```bash
-git clone https://github.com/Smart-Park-Ride-Reservation-System/smart-park-and-ride-backend.git
-cd smart-park-and-ride-backend
-```
-
-### 2. Configure the database
-
-Create the database if the application uses the default database name:
-
-```sql
-CREATE DATABASE parking_db;
-```
-
-Configure the database connection using the properties expected by the project in `application.properties` or `application.yml`.
-
-### 3. Configure environment variables
-
-Set the database credentials, JWT configuration and any required external-service credentials according to the application's configuration.
-
-Do not commit real credentials, API keys, private keys or `.env` files to GitHub. Use environment variables and provide only safe example values in documentation.
-
-### 4. Run the backend
-
-If the Maven Wrapper is available, run on Windows:
-
-```powershell
-.\mvnw.cmd spring-boot:run
-```
-
-Or use Maven:
-
-```bash
-mvn spring-boot:run
-```
-
-The application typically starts on port `8080`, unless a different port is configured.
-
-> **Note:** Confirm the database configuration, required environment variables and startup instructions against the current source code before running the application.
+- Strengthening real-time synchronisation and handling delayed sensor updates.
+- Improving authentication and session lifecycle management.
+- Expanding automated API, integration and hardware tests.
+- Improving deployment reliability and production monitoring.
+- Extending payment handling and transaction verification.
+- Evaluating the system at a physical transport hub and extending it to additional locations.
 
 ## Project Information
 
-| Item | Details |
-|---|---|
-| Project type | Individual final-year undergraduate project |
-| Institution | University of Moratuwa, Sri Lanka |
-| Degree | Bachelor of Information Technology (External) |
-| Reference context | Makumbura Multimodal Transport Centre (MMTC) |
+**Project:** Smart Park & Ride Reservation System for Integrated Transport Hubs  
+**Institution:** University of Moratuwa, Sri Lanka  
+**Degree:** Bachelor of Information Technology (External)  
+**Project type:** Individual final-year project
 
 ## Author
 
 **Chamathka Nethmini Wijesinghe**
 
-- [GitHub](https://github.com/chamaneth)
-- [LinkedIn](https://www.linkedin.com/in/chamathka-nethmini-wije/)
+- GitHub: [@chamaneth](https://github.com/chamaneth)
+- LinkedIn: [Chamathka Nethmini Wijesinghe](https://www.linkedin.com/in/chamathka-nethmini-wije/)
 
 ## Licence
 

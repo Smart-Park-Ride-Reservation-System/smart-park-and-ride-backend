@@ -11,7 +11,7 @@ import java.util.regex.*;
 
 public class SeedReservations {
 
-    private static final String API_URL = "https://smartpark-reservation-backend-production.up.railway.app"; // adjust to your backend port
+    private static final String API_URL = System.getProperty("api.url");
     private static final HttpClient client = HttpClient.newHttpClient();
 
     private static final String HUB_NAME = "Makumbura Multimodal Transport Hub";
